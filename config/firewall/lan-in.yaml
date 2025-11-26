@@ -38,7 +38,7 @@ rules:
 	- name: Block VLAN90 -> Internal networks
 		action: drop
 		src_network: 10.0.90.0/25
-		dst_networks: [10.0.10.0/26, 10.0.30.0/24, 10.0.40.0/27, 10.0.1.0/24]
+		dst_networks: [10.0.10.0/26, 10.0.30.0/24, 10.0.40.0/27, 10.0.1.0/27]
 		logging: true
 
 	- name: Allow VLAN30 -> NTP (Internet)
