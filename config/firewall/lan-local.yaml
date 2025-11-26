@@ -14,6 +14,12 @@ rules:
 		src_network: 10.0.1.0/27
 		dst_ports: [22, 53, 443, 8443]
 
+	- name: Allow VLAN1 (Management) -> DNS (UDP)
+		action: accept
+		protocol: udp
+		src_network: 10.0.1.0/27
+		dst_port: 53
+
 	- name: Allow DNS from VLAN30, VLAN40, and VLAN90 to gateway
 		action: accept
 		protocol: udp
@@ -40,10 +46,6 @@ rules:
 		dst_network: 10.0.10.0/26
 		dst_ports: [5060, 5061, 10000-20000]
 
-	- name: Allow Management full access
-		action: accept
-		src_network: 10.0.1.0/27
-		dst_network: any
 
 	- name: Default deny to gateway
 		action: drop
