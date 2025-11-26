@@ -1,0 +1,18 @@
+# config/firewall/wan-in.yaml — WAN IN Firewall Rules
+# Traffic entering from the internet (inbound port forwarding, etc.)
+
+# TODO: populate after VLANs are stable
+
+# Example rules (to be implemented):
+# rules:
+#   - name: Allow established/related
+#     action: accept
+#     state: [established, related]
+#   
+#   - name: Drop invalid packets
+#     action: drop
+#     state: [invalid]
+#   
+#   - name: Drop all other inbound (default deny)
+#     action: drop
+#     logging: true

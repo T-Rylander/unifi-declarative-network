@@ -1,0 +1,21 @@
+# config/firewall/lan-in.yaml — LAN IN Firewall Rules
+# Traffic entering the gateway from LAN-side interfaces
+
+# TODO: populate after VLANs are stable
+
+# Example rules (to be implemented):
+# rules:
+#   - name: Allow established/related
+#     action: accept
+#     state: [established, related]
+#   
+#   - name: Drop invalid packets
+#     action: drop
+#     state: [invalid]
+#   
+#   - name: Allow VLAN 30 -> VLAN 10 DNS
+#     action: accept
+#     protocol: udp
+#     src_network: 10.0.30.0/24
+#     dst_network: 10.0.10.10/32
+#     dst_port: 53

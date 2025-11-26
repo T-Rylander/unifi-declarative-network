@@ -1,0 +1,23 @@
+# config/firewall/lan-local.yaml — LAN LOCAL Firewall Rules
+# Traffic destined for the gateway itself (SSH, DNS, DHCP, etc.)
+
+# TODO: populate after VLANs are stable
+
+# Example rules (to be implemented):
+# rules:
+#   - name: Allow DHCP from all VLANs
+#     action: accept
+#     protocol: udp
+#     src_port: 68
+#     dst_port: 67
+#   
+#   - name: Allow DNS from all VLANs
+#     action: accept
+#     protocol: udp
+#     dst_port: 53
+#   
+#   - name: Allow SSH from VLAN 10 only
+#     action: accept
+#     protocol: tcp
+#     src_network: 10.0.10.0/24
+#     dst_port: 22

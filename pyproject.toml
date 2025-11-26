@@ -1,0 +1,23 @@
+[project]
+name = "unifi-declarative-network"
+version = "0.1.0"
+description = "Declarative UniFi network management with hardware-aware validation"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Travis" }]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
