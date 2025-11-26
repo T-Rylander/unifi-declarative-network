@@ -5,15 +5,15 @@ vlans:
   "1":
     name: unifi-management
     purpose: UniFi Controller, Cloud Key, APs, Switches — adoption & management plane
-    subnet: 10.0.1.0/24
+    subnet: 10.0.1.0/27
     gateway: 10.0.1.1
     vlan_id: 1
     vlan_enabled: true
     networkgroup: LAN
     domain_name: rylan.home
     dhcp_enabled: true
-    dhcp_start: 10.0.1.100
-    dhcp_stop: 10.0.1.200
+    dhcp_start: 10.0.1.10
+    dhcp_stop: 10.0.1.30
     dhcp_lease: 86400
     dhcp_dns: [10.0.10.10]
     igmp_snooping: true
@@ -27,15 +27,15 @@ vlans:
   "10":
     name: servers-infra
     purpose: rylan-dc, AI workstation, monitoring, NFS, FreePBX
-    subnet: 10.0.10.0/24
+    subnet: 10.0.10.0/26
     gateway: 10.0.10.1
     vlan_id: 10
     vlan_enabled: true
     networkgroup: LAN
     domain_name: rylan.home
     dhcp_enabled: true
-    dhcp_start: 10.0.10.100
-    dhcp_stop: 10.0.10.249
+    dhcp_start: 10.0.10.51
+    dhcp_stop: 10.0.10.62
     dhcp_lease: 86400
     dhcp_dns: [10.0.10.10]
     igmp_snooping: true
@@ -88,7 +88,7 @@ vlans:
   "90":
     name: guest-iot
     purpose: Guest WiFi and IoT devices - isolated from trusted networks
-    subnet: 10.0.90.0/24
+    subnet: 10.0.90.0/25
     gateway: 10.0.90.1
     vlan_id: 90
     vlan_enabled: true
@@ -96,7 +96,7 @@ vlans:
     domain_name: guest.rylan.home
     dhcp_enabled: true
     dhcp_start: 10.0.90.100
-    dhcp_stop: 10.0.90.250
+    dhcp_stop: 10.0.90.126
     dhcp_lease: 3600
     dhcp_dns: [1.1.1.1, 1.0.0.1]
     igmp_snooping: false
