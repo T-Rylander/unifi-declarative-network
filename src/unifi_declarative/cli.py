@@ -9,6 +9,7 @@ from .validators import (
     validate_vlan_schema,
     validate_uplink_trunk_config,
     validate_controller_ip_migration,
+    validate_hardware_inventory,
     ValidationError,
 )
 from .differ import diff_configs
@@ -31,6 +32,7 @@ def cmd_validate(repo_root: Path) -> int:
         validate_vlan_schema(v)
     validate_uplink_trunk_config(hardware, vlans)
     validate_controller_ip_migration(hardware, vlans)
+    validate_hardware_inventory(hardware)
     print("Validation OK: VLANs, uplink trunk, controller migration.")
     return 0
 
@@ -78,9 +80,18 @@ def cmd_apply(repo_root: Path, dry_run: bool) -> int:
 
     # TODO: Perform REST apply operations
     # On success, write state
+    # sanitize state before writing
+    def sanitize_state_for_storage(state: dict) -> dict:
+        sanitized = json.loads(json.dumps(state))  # deep copy
+        for section in ("controller", "wan"):
+            if section in sanitized:
+                for key in ("password", "secret", "community", "radius_key"):
+                    sanitized[section].pop(key, None)
+        return sanitized
+
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with STATE_FILE.open("w", encoding="utf-8") as sf:
-        yaml.safe_dump(desired, sf, sort_keys=False)
+        yaml.safe_dump(sanitize_state_for_storage(desired), sf, sort_keys=False)
     print(f"State saved to {STATE_FILE}")
     return 0
 
@@ -93,6 +104,7 @@ def main() -> int:
     sub.add_parser("validate")
     sub.add_parser("status")
     sub.add_parser("backup")
+    sub.add_parser("rollback")
 
     p_apply = sub.add_parser("apply")
     p_apply.add_argument("--dry-run", action="store_true")
@@ -110,6 +122,14 @@ def main() -> int:
         return cmd_status(client)
     if args.cmd == "backup":
         return cmd_backup(client, repo_root)
+    if args.cmd == "rollback":
+        # minimal rollback placeholder: print last state path
+        if STATE_FILE.exists():
+            print(f"Would rollback using {STATE_FILE}")
+            return 0
+        else:
+            print("No state file found for rollback")
+            return 1
     if args.cmd == "apply":
         return cmd_apply(repo_root, args.dry_run)
 

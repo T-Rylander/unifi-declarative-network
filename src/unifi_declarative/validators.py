@@ -184,3 +184,26 @@ def validate_controller_ip_migration(hardware: Dict[str, Any], vlans: Dict[str, 
 
     if ip_address(gateway10) not in subnet10:
         raise ValidationError("VLAN 10 gateway must reside within VLAN 10 subnet")
+
+
+def validate_hardware_inventory(hardware: Dict[str, Any]) -> None:
+    """Ensure hardware.yaml has no TBD placeholders and critical MACs are present."""
+    hw = load_hardware_profile(hardware)
+    switches: List[Dict[str, Any]] = hw.get("switches", [])
+    errors: List[str] = []
+
+    for sw in switches:
+        pa = sw.get("port_assignments", {})
+        if isinstance(pa, dict):
+            for port_num, cfg in pa.items():
+                text = str(cfg)
+                if "TBD" in text:
+                    errors.append(f"Switch {sw.get('model')} port {port_num} has TBD entries")
+                mac = cfg.get("mac")
+                device = cfg.get("device", "")
+                # If a device is specified and it's not 'empty', prefer having a MAC
+                if device and device != "empty" and not mac:
+                    errors.append(f"Switch {sw.get('model')} port {port_num} missing device MAC")
+
+    if errors:
+        raise ValidationError("\n".join(errors))

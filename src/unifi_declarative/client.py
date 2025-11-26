@@ -2,6 +2,7 @@ import os
 import json
 import time
 import requests
+from requests.exceptions import Timeout, ConnectionError, HTTPError
 from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 
@@ -34,9 +35,20 @@ class UniFiClient:
 
     def post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
-        resp = self.session.post(url, json=payload, verify=self.verify_ssl)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = self.session.post(url, json=payload, verify=self.verify_ssl, timeout=30)
+            if resp.status_code == 401:
+                # try re-login once
+                self.login()
+                resp = self.session.post(url, json=payload, verify=self.verify_ssl, timeout=30)
+            resp.raise_for_status()
+            return resp.json()
+        except Timeout:
+            raise RuntimeError("Controller timeout after 30s")
+        except ConnectionError as e:
+            raise RuntimeError(f"Cannot reach controller: {e}")
+        except HTTPError as e:
+            raise RuntimeError(f"API error {resp.status_code}: {resp.text}")
 
     def export_backup(self) -> bytes:
         # Controller export endpoint varies by version; using legacy path

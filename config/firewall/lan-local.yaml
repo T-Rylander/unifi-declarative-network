@@ -20,6 +20,25 @@ rules:
 		src_network: 10.0.10.0/24
 		dst_port: 22
 
+	- name: Allow Users to Servers common ports
+		action: accept
+		protocol: tcp
+		src_network: 10.0.30.0/24
+		dst_network: 10.0.10.0/24
+		dst_ports: [80, 443, 445, 3389]
+
+	- name: Allow VoIP to FreePBX
+		action: accept
+		protocol: udp
+		src_network: 10.0.40.0/27
+		dst_network: 10.0.10.0/24
+		dst_ports: [5060, 5061, 10000-20000]
+
+	- name: Allow Management full access
+		action: accept
+		src_network: 10.0.1.0/24
+		dst_network: any
+
 	- name: Default deny to gateway
 		action: drop
 		logging: true
