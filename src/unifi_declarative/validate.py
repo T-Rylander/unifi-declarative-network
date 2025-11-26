@@ -4,7 +4,13 @@ import os
 import yaml
 from dotenv import load_dotenv
 
-from .validators import validate_vlan_count, validate_vlan_schema, ValidationError
+from .validators import (
+    validate_vlan_count,
+    validate_vlan_schema,
+    validate_uplink_trunk_config,
+    validate_controller_ip_migration,
+    ValidationError,
+)
 
 
 def main() -> int:
@@ -13,6 +19,7 @@ def main() -> int:
 
     repo_root = Path(__file__).resolve().parents[2]
     vlans_path = repo_root / "config" / "vlans.yaml"
+    hardware_path = repo_root / "config" / "hardware.yaml"
 
     if not vlans_path.exists():
         print(f"Error: VLAN config not found at {vlans_path}")
@@ -23,6 +30,11 @@ def main() -> int:
             data = yaml.safe_load(f) or {}
         vlans = data.get("vlans", {})
 
+        if not hardware_path.exists():
+            raise ValidationError("Missing config/hardware.yaml — required for topology checks")
+        with hardware_path.open("r", encoding="utf-8") as hf:
+            hardware = yaml.safe_load(hf) or {}
+
         # Hardware limit validation
         validate_vlan_count(vlans, hardware_profile=hardware)
 
@@ -30,8 +42,12 @@ def main() -> int:
         for key, vlan in vlans.items():
             validate_vlan_schema(vlan)
 
+        # Topology validations using hardware.yaml
+        validate_uplink_trunk_config(hardware, vlans)
+        validate_controller_ip_migration(hardware, vlans)
+
         print(
-            f"Validation successful: {len(vlans)} VLANs compliant with '{hardware}' hardware profile."
+            f"Validation successful: {len(vlans)} VLANs compliant; uplink trunk and controller migration validated."
         )
         return 0
 

@@ -5,7 +5,8 @@ Enforces schema correctness, hardware constraints, and idempotency guarantees
 before any API calls reach the UniFi controller.
 """
 
-from typing import Any
+from typing import Any, Dict, List, Optional
+from ipaddress import ip_network, ip_address
 
 
 class ValidationError(Exception):
@@ -107,3 +108,79 @@ def validate_subnet_overlap(vlans: dict[str, Any]) -> None:
     # TODO: Implement IP subnet overlap detection
     # Will use ipaddress.ip_network() to check for conflicts
     pass
+
+
+def load_hardware_profile(hardware: Dict[str, Any]) -> Dict[str, Any]:
+    """Lightweight extractor for hardware.yaml fields used by validators."""
+    return {
+        "gateway": hardware.get("gateway", {}),
+        "switches": hardware.get("switches", []),
+        "controller": hardware.get("controller", {}),
+    }
+
+
+def validate_uplink_trunk_config(hardware: Dict[str, Any], vlans: Dict[str, Any]) -> None:
+    """
+    Ensure the US-8-60W uplink port to the gateway is a trunk with VLAN 1 native
+    and tags for VLANs present in config (10, 30, 40 as per v3.0).
+    """
+    hw = load_hardware_profile(hardware)
+    switches: List[Dict[str, Any]] = hw.get("switches", [])
+    target_switch = next((s for s in switches if s.get("model") == "US-8-60W"), None)
+    if not target_switch:
+        raise ValidationError("US-8-60W switch definition missing in hardware.yaml")
+
+    uplink_port = target_switch.get("uplink_port")
+    ports: Dict[str, Any] = target_switch.get("port_assignments", {})
+    uplink = ports.get(str(uplink_port)) or ports.get(uplink_port)
+    if not uplink:
+        raise ValidationError(f"Uplink port '{uplink_port}' assignment not found on US-8-60W")
+
+    if uplink.get("type") != "trunk":
+        raise ValidationError("US-8-60W uplink must be 'trunk'")
+
+    if uplink.get("native_vlan") != 1:
+        raise ValidationError("Native VLAN on uplink trunk must be 1 for management/adoption")
+
+    # Expected tagged VLANs from config
+    required_tags = sorted([int(v) for v in vlans.keys() if int(v) != 1])
+    actual_tags = sorted(list(uplink.get("tagged_vlans", [])))
+    if actual_tags != required_tags:
+        raise ValidationError(
+            f"Uplink trunk tagged VLANs mismatch. Expected {required_tags}, found {actual_tags}"
+        )
+
+
+def validate_controller_ip_migration(hardware: Dict[str, Any], vlans: Dict[str, Any]) -> None:
+    """
+    Verify controller target IP belongs to VLAN 10 subnet and differs from current.
+    Also ensure VLAN 10 gateway aligns with hardware target network semantics.
+    """
+    hw = load_hardware_profile(hardware)
+    controller = hw.get("controller", {})
+    current_ip = controller.get("current_ip")
+    target_ip = controller.get("target_ip")
+
+    if not (current_ip and target_ip):
+        raise ValidationError("Controller current_ip/target_ip must be specified in hardware.yaml")
+
+    if current_ip == target_ip:
+        raise ValidationError("Controller target_ip must differ from current_ip for migration")
+
+    vlan10 = vlans.get("10")
+    if not vlan10:
+        raise ValidationError("VLAN 10 not found in vlans.yaml for controller placement")
+
+    subnet10 = ip_network(vlan10["subnet"])  # e.g., 10.0.10.0/24
+    if ip_address(target_ip) not in subnet10:
+        raise ValidationError(
+            f"Controller target_ip {target_ip} must be within VLAN 10 subnet {subnet10}"
+        )
+
+    # Gateway alignment
+    gateway10 = vlan10.get("gateway")
+    if not gateway10:
+        raise ValidationError("VLAN 10 gateway missing in vlans.yaml")
+
+    if ip_address(gateway10) not in subnet10:
+        raise ValidationError("VLAN 10 gateway must reside within VLAN 10 subnet")
