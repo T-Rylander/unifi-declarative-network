@@ -85,3 +85,22 @@ vlans:
       downlink_priority: 7
       dscp_marking: 46
     enabled: true
+
+  'legacy':
+    name: 'legacy-corporate'
+    purpose: 'Temporary bootstrap (192.168.1.0/24) - delete post-migration'
+    subnet: '192.168.1.0/24'
+    gateway: '192.168.1.1'
+    vlan_id: 0  # No VLAN ID for untagged legacy
+    vlan_enabled: false
+    networkgroup: 'LAN'
+    domain_name: 'rylan.home'
+    dhcp_enabled: true
+    dhcp_start: '192.168.1.100'
+    dhcp_stop: '192.168.1.200'
+    dhcp_lease: 86400
+    dhcp_dns: ['192.168.1.1', '1.1.1.1']
+    igmp_snooping: false
+    multicast_dns: true
+    enabled: true
+    notes: 'Safety net - manual delete after all devices migrated'
