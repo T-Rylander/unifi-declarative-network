@@ -39,6 +39,12 @@ python -m src.unifi_declarative.validate
 python -m src.unifi_declarative.apply --dry-run
 ```
 
+## Migration & Operations 🛤️
+- `docs/MIGRATION_GUIDE.md`: Step-by-step migration runbook (manual, safe OS changes; use `netplan try`).
+- `docs/ROLLBACK_PROCEDURES.md`: Emergency recovery for netplan, controller restore, and switch port reversion.
+- `docs/MANUAL_TASKS.md`: OS tasks intentionally kept manual (netplan, DNS, UFW, time sync, device re-inform).
+- Script: `scripts/pre-migration-smoke-test.sh` — non-destructive checks (controller reachability, backup presence, offline validation).
+
 ## Architecture
 See `docs/hardware-constraints.md` for USG-3P design decisions.
 
