@@ -8,6 +8,12 @@ rules:
 		src_port: 68
 		dst_port: 67
 
+	- name: Allow VLAN1 (Management) -> Gateway services
+		action: accept
+		protocol: tcp
+		src_network: 10.0.1.0/27
+		dst_ports: [22, 53, 443, 8443]
+
 	- name: Allow DNS from VLAN30, VLAN40, and VLAN90 to gateway
 		action: accept
 		protocol: udp
