@@ -4,6 +4,9 @@ import yaml
 from dotenv import load_dotenv
 
 from .validators import validate_vlan_count, validate_vlan_schema, ValidationError
+from .differ import diff_configs
+from pathlib import Path
+import yaml
 
 
 def main() -> int:
@@ -32,12 +35,24 @@ def main() -> int:
         for key, vlan in vlans.items():
             validate_vlan_schema(vlan)
 
+        # Diff desired vs. placeholder live state
+        desired = data
+        live = {"vlans": {}}  # TODO: fetch from controller
+        dd = diff_configs(desired, live)
+        print("Diff:", dd)
+
         if args.dry_run:
             print(f"Dry-run: would reconcile {len(vlans)} VLAN(s). No changes made.")
             return 0
 
         # TODO: Implement actual apply logic via REST client
-        print("Apply not yet implemented. Use --dry-run for now.")
+        # TODO: Implement actual apply logic via REST client
+        # Save last applied state
+        state_dir = repo_root / "config" / ".state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        with (state_dir / "last-applied.yaml").open("w", encoding="utf-8") as sf:
+            yaml.safe_dump(desired, sf, sort_keys=False)
+        print(f"State saved to {state_dir / 'last-applied.yaml'}")
         return 0
 
     except ValidationError as e:

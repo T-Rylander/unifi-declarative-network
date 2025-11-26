@@ -1,23 +1,25 @@
-# config/firewall/lan-local.yaml — LAN LOCAL Firewall Rules
+# config/firewall/lan-local.yaml — Production LAN LOCAL Rules (default deny)
 # Traffic destined for the gateway itself (SSH, DNS, DHCP, etc.)
 
-# TODO: populate after VLANs are stable
+rules:
+	- name: Allow DHCP from all VLANs
+		action: accept
+		protocol: udp
+		src_port: 68
+		dst_port: 67
 
-# Example rules (to be implemented):
-# rules:
-#   - name: Allow DHCP from all VLANs
-#     action: accept
-#     protocol: udp
-#     src_port: 68
-#     dst_port: 67
-#   
-#   - name: Allow DNS from all VLANs
-#     action: accept
-#     protocol: udp
-#     dst_port: 53
-#   
-#   - name: Allow SSH from VLAN 10 only
-#     action: accept
-#     protocol: tcp
-#     src_network: 10.0.10.0/24
-#     dst_port: 22
+	- name: Allow DNS from VLAN30 and VLAN40 to gateway
+		action: accept
+		protocol: udp
+		src_networks: [10.0.30.0/24, 10.0.40.0/27]
+		dst_port: 53
+
+	- name: Allow SSH from VLAN10 only
+		action: accept
+		protocol: tcp
+		src_network: 10.0.10.0/24
+		dst_port: 22
+
+	- name: Default deny to gateway
+		action: drop
+		logging: true

@@ -17,6 +17,9 @@ secrets/
 backups/
 *.unf
 
+# State tracking
+config/.state/
+
 # IDE
 .vscode/
 .idea/

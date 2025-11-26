@@ -1,0 +1,39 @@
+# config/network-ports.yaml — FINAL PRODUCTION TOPOLOGY
+# US-8-60W uplink is PORT 1 → USG eth1 (not Port 5!)
+
+interfaces:
+  eth0:
+    role: wan
+    description: "Internet uplink (No-IP dynamic)"
+  eth1:
+    role: lan
+    description: "Trunk to US-8-60W Port 1"
+    native_vlan: 1
+    tagged_vlans: [10, 30, 40]
+  eth2:
+    role: unused
+
+switch_profiles:
+  trunk_to_usg:
+    description: "US-8-60W Port 1 → USG eth1"
+    native_vlan: 1
+    tagged_vlans: [10, 30, 40]
+
+  voip_phones:
+    description: "Grandstream phones"
+    native_vlan: 40
+    lldp_med: true
+    poe: true
+
+  user_access:
+    description: "Workstations, rylan-dc, Denon"
+    native_vlan: 30
+
+  ap_management:
+    description: "UAP-AC-Lite access points"
+    native_vlan: 1
+    poe: true
+
+  flex_mini_downstream:
+    description: "USW-Flex-Mini ports"
+    native_vlan: 30  # or 10 if AI workstation

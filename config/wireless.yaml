@@ -1,20 +1,11 @@
-# config/wireless.yaml — Wireless Network Configuration
-# 25 November 2025
-
-# TODO: Populate after VLAN topology is stable
-# 
-# Planned SSIDs:
-#   - Rylan-Home (VLAN 30, WPA3-Enterprise via FreeRADIUS)
-#   - Rylan-Guest (Client isolation, WAN-only access, captive portal)
-#   - Rylan-IoT (VLAN 90 post-UXG-Pro migration, or MAC-based rules on VLAN 30)
-#
-# Example structure (for future implementation):
-# ssids:
-#   - name: Rylan-Guest
-#     enabled: true
-#     security: open
-#     guest_policy: true
-#     client_isolation: true
-#     vlan: null  # No VLAN assignment, firewall handles isolation
-#     rate_limit_down: 50000  # 50 Mbps
-#     rate_limit_up: 10000    # 10 Mbps
+ssids:
+	- name: "Rylan-Home"
+		vlan: 30
+		password: "REDACTED"
+		security: wpa3
+	- name: "Rylan-Guest"
+		vlan: 1
+		guest_policy: true
+		client_isolation: true
+		bandwidth_limit_down: 50
+		bandwidth_limit_up: 10

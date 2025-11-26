@@ -1,21 +1,35 @@
-# config/firewall/lan-in.yaml — LAN IN Firewall Rules
-# Traffic entering the gateway from LAN-side interfaces
+# config/firewall/lan-in.yaml — Production LAN IN Rules (default deny)
+# Inter-VLAN traffic entering the gateway from LAN-side interfaces
 
-# TODO: populate after VLANs are stable
+rules:
+	- name: Allow established/related
+		action: accept
+		state: [established, related]
 
-# Example rules (to be implemented):
-# rules:
-#   - name: Allow established/related
-#     action: accept
-#     state: [established, related]
-#   
-#   - name: Drop invalid packets
-#     action: drop
-#     state: [invalid]
-#   
-#   - name: Allow VLAN 30 -> VLAN 10 DNS
-#     action: accept
-#     protocol: udp
-#     src_network: 10.0.30.0/24
-#     dst_network: 10.0.10.10/32
-#     dst_port: 53
+	- name: Drop invalid packets
+		action: drop
+		state: [invalid]
+
+	- name: Allow VLAN30 -> DNS on VLAN10
+		action: accept
+		protocol: udp
+		src_network: 10.0.30.0/24
+		dst_network: 10.0.10.10/32
+		dst_port: 53
+
+	- name: Allow VLAN40 (VoIP) -> DNS on VLAN10
+		action: accept
+		protocol: udp
+		src_network: 10.0.40.0/27
+		dst_network: 10.0.10.10/32
+		dst_port: 53
+
+	- name: Allow VLAN30 -> NTP (Internet)
+		action: accept
+		protocol: udp
+		src_network: 10.0.30.0/24
+		dst_port: 123
+
+	- name: Default deny inter-VLAN
+		action: drop
+		logging: true
