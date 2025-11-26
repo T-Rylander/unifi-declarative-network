@@ -27,18 +27,18 @@ rules:
 	- name: Allow VLAN90 (Guest) -> DNS on gateway
 		action: accept
 		protocol: udp
-		src_network: 10.0.90.0/24
+		src_network: 10.0.90.0/25
 		dst_port: 53
 
 	- name: Allow VLAN90 -> Internet only (block other VLANs)
 		action: accept
-		src_network: 10.0.90.0/24
+		src_network: 10.0.90.0/25
 		dst_network: '!10.0.0.0/8'
 
 	- name: Block VLAN90 -> Internal networks
 		action: drop
-		src_network: 10.0.90.0/24
-		dst_networks: [10.0.10.0/24, 10.0.30.0/24, 10.0.40.0/27, 10.0.1.0/24]
+		src_network: 10.0.90.0/25
+		dst_networks: [10.0.10.0/26, 10.0.30.0/24, 10.0.40.0/27, 10.0.1.0/24]
 		logging: true
 
 	- name: Allow VLAN30 -> NTP (Internet)
