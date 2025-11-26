@@ -4,7 +4,7 @@ ssids:
 		password: "REDACTED"
 		security: wpa3
 	- name: "Rylan-Guest"
-		vlan: 1
+		vlan: 90
 		guest_policy: true
 		client_isolation: true
 		bandwidth_limit_down: 50

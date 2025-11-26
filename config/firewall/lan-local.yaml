@@ -8,10 +8,10 @@ rules:
 		src_port: 68
 		dst_port: 67
 
-	- name: Allow DNS from VLAN30 and VLAN40 to gateway
+	- name: Allow DNS from VLAN30, VLAN40, and VLAN90 to gateway
 		action: accept
 		protocol: udp
-		src_networks: [10.0.30.0/24, 10.0.40.0/27]
+		src_networks: [10.0.30.0/24, 10.0.40.0/27, 10.0.90.0/24]
 		dst_port: 53
 
 	- name: Allow SSH from VLAN10 only

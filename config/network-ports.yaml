@@ -9,7 +9,7 @@ interfaces:
     role: lan
     description: "Trunk to US-8-60W Port 1"
     native_vlan: 1
-    tagged_vlans: [10, 30, 40]
+    tagged_vlans: [10, 30, 40, 90]
   eth2:
     role: unused
 
@@ -17,7 +17,7 @@ switch_profiles:
   trunk_to_usg:
     description: "US-8-60W Port 1 → USG eth1"
     native_vlan: 1
-    tagged_vlans: [10, 30, 40]
+    tagged_vlans: [10, 30, 40, 90]
 
   voip_phones:
     description: "Grandstream phones"
