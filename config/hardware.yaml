@@ -1,0 +1,134 @@
+# config/hardware.yaml — FINAL PRODUCTION VERSION
+# 2025-11-26 — Leo + Travis + Grok (converged truth)
+
+gateway:
+  model: USG-3P
+  mac: e0:63:da:86:0b:ef
+  firmware: 4.4.57
+  stp_priority: 32768
+  current_ip: 192.168.1.1
+  target_ip: 10.0.1.1
+  current_network: 192.168.1.0/24
+  target_network: 10.0.1.0/24
+  interfaces:
+    eth0:
+      role: wan
+      description: Internet uplink (No-IP dynamic)
+      current_ip: 73.206.89.6
+    eth1:
+      role: lan
+      description: Trunk to US-8-60W port 1
+      stp_enabled: true
+    eth2:
+      role: unused
+
+switches:
+  - model: US-8-60W
+    mac: fc:ec:da:4e:1c:bd
+    firmware: 7.2.123
+    current_ip: 192.168.1.6
+    target_ip: 10.0.1.6
+    poe_budget_watts: 60
+    poe_current_draw_watts: 2.93
+    stp_priority: 32768
+    uplink_port: 1                                 # LEO WAS RIGHT — NOT port 5
+    port_assignments:
+      1:
+        device: USG-3P eth1
+        type: trunk
+        native_vlan: 1
+        tagged_vlans: [10, 30, 40]
+        description: Real uplink to gateway
+      2:
+        device: Denon AVR + living-room devices
+        type: access
+        native_vlan: 30
+        description: Entertainment center via unmanaged switch
+      3:
+        device: Windows workstation OR rylan-dc (TBD)
+        type: access
+        native_vlan: 30
+        notes: Likely the unknown MAC 88:a2:9e:28:32:c1 or similar
+      4:
+        device: empty
+      5:
+        device: USW-Flex-Mini 2.5G (or rylan-dc if swapped)
+        type: access
+        native_vlan: 10      # rylan-dc lives here in final state
+        mac: 2c:fd:5d:35:6a:34
+        stp_priority: 32768
+      6:
+        device: UAP-AC-Lite (upstairs)
+        type: access
+        native_vlan: 1
+        mac: fc:ec:da:3d:fc:a4
+        poe: true
+      7:
+        device: empty
+      8:
+        device: empty
+
+  - model: USW-Flex-Mini
+    mac: 2c:fd:5d:35:6a:34
+    ports: 5
+    poe_passthrough: true
+    parent_switch: US-8-60W
+    parent_port: 5
+    notes: 2.5G capable — perfect for AI workstation or future 10G
+
+access_points:
+  - model: UAP-AC-Lite
+    mac: fc:ec:da:3d:fc:a4
+    firmware: 6.6.77
+    location: upstairs
+    current_ip: 192.168.1.19
+    target_ip: 10.0.1.19
+    connected_to: US-8-60W port 6
+    wireless_clients:
+      - iPad d0.1a (-64 dBm)
+      - iPhone e2.0b (-73 dBm)
+      - Watch a3.27 (-65 dBm)
+      - TRead S21-Ultra d0.84 (-65 dBm)
+
+  - model: UAP-AC-Lite
+    mac: fc:ec:da:10:d2:b2
+    firmware: 6.6.77
+    location: downstairs
+    current_ip: 192.168.1.9
+    target_ip: 10.0.1.9
+
+servers:
+  - hostname: rylan-dc
+    role: UniFi Controller + AD + NFS + AI host
+    os: Ubuntu 24.04.3 LTS
+    kernel: 6.8.0-88-generic
+    cpu: Intel Core i3-9100 @ 3.60GHz
+    cores: 4
+    memory_gb: 16
+    architecture: x86_64
+    virtualization: bare-metal
+    current_ip: 192.168.1.20          # bootstrap
+    target_ip: 10.0.10.10             # final — VLAN 10
+    connected_to: US-8-60W port 5     # final state (or port 3 if swapped)
+    services:
+      unifi_controller:
+        version: 8.1.113
+        install_type: native          # NOT Docker
+        data_path: /usr/lib/unifi/data
+      active_directory: true
+      nfs_server: true
+
+controller:
+  type: native
+  version: 8.1.113
+  host_server: rylan-dc
+  current_ip: 192.168.1.20
+  target_ip: 10.0.10.10               # moves from VLAN 1 → VLAN 10
+  port: 8443
+
+wan:
+  interface: WAN1
+  type: dhcp
+  ddns_provider: no-ip
+  ddns_hostname: rylan.ddns.net
+  current_public_ip: 73.206.89.6
