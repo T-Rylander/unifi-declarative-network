@@ -45,6 +45,9 @@ See `docs/hardware-constraints.md` for USG-3P design decisions.
 ## Documentation
 - `docs/adr/001-python-over-bash.md`
 - `docs/hardware-constraints.md`
+- `docs/MIGRATION_GUIDE.md` (step-by-step migration runbook)
+- `docs/ROLLBACK_PROCEDURES.md` (emergency recovery)
+- `docs/MANUAL_TASKS.md` (OS steps intentionally manual)
 - Schema reference (coming soon)
 
 ## License
