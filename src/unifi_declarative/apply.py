@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 
 from .validators import validate_vlan_count, validate_vlan_schema, ValidationError
 from .differ import diff_configs
-from pathlib import Path
-import yaml
+from .client import UniFiClient
 
 
 def main() -> int:
@@ -45,8 +44,15 @@ def main() -> int:
             print(f"Dry-run: would reconcile {len(vlans)} VLAN(s). No changes made.")
             return 0
 
-        # TODO: Implement actual apply logic via REST client
-        # TODO: Implement actual apply logic via REST client
+        # Perform REST apply logic via UniFi client
+        client = UniFiClient.from_env()
+        client.login()
+        live_networks = client.list_networks()
+        # Upsert each desired VLAN
+        for key, vlan in vlans.items():
+            client.upsert_vlan(vlan)
+        print(f"Applied {len(vlans)} VLAN(s) to controller.")
+
         # Save last applied state
         state_dir = repo_root / "config" / ".state"
         state_dir.mkdir(parents=True, exist_ok=True)

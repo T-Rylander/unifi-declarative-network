@@ -29,7 +29,7 @@ class UniFiClient:
 
     def get(self, path: str) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
-        resp = self.session.get(url, verify=self.verify_ssl)
+        resp = self.session.get(url, verify=self.verify_ssl, timeout=30)
         resp.raise_for_status()
         return resp.json()
 
@@ -56,6 +56,29 @@ class UniFiClient:
         resp = self.session.post(f"{self.base_url}{path}", json={"cmd": "backup"}, verify=self.verify_ssl)
         resp.raise_for_status()
         return resp.content
+
+    # ---- Networks (VLANs) ----
+    def list_networks(self) -> Dict[str, Any]:
+        """List network configurations (includes VLANs)."""
+        return self.get(f"/api/s/{self.site}/rest/networkconf")
+
+    def upsert_vlan(self, vlan: Dict[str, Any]) -> Dict[str, Any]:
+        """Create or update a VLAN network configuration."""
+        payload = {
+            "name": vlan["name"],
+            "vlan": vlan["vlan_id"],
+            "subnet": vlan["subnet"],
+            "gateway": vlan["gateway"],
+            "dhcp_enabled": vlan.get("dhcp_enabled", True),
+            "domain_name": vlan.get("domain_name"),
+            "dns1": (vlan.get("dhcp_dns") or [None])[0],
+            "dns2": (vlan.get("dhcp_dns") or [None, None])[1] if len(vlan.get("dhcp_dns", [])) > 1 else None,
+            "purpose": vlan.get("purpose"),
+            "enabled": vlan.get("enabled", True),
+        }
+        # Remove None values
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return self.post(f"/api/s/{self.site}/rest/networkconf", payload)
 
     @classmethod
     def from_env(cls) -> "UniFiClient":
