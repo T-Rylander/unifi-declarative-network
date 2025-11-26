@@ -119,21 +119,6 @@ def main() -> int:
     if args.cmd == "validate":
         return cmd_validate(repo_root)
 
-    client = UniFiClient.from_env()
-    client.login()
-
-    if args.cmd == "status":
-        return cmd_status(client)
-    if args.cmd == "backup":
-        return cmd_backup(client, repo_root)
-    if args.cmd == "rollback":
-        # minimal rollback placeholder: print last state path
-        if STATE_FILE.exists():
-            print(f"Would rollback using {STATE_FILE}")
-            return 0
-        else:
-            print("No state file found for rollback")
-            return 1
     if args.cmd == "apply":
         # Reuse apply entry in apply.py to avoid duplicate logic
         from .apply import main as apply_main
@@ -150,6 +135,23 @@ def main() -> int:
         if args.force:
             sys.argv.append("--force")
         return apply_main()
+
+    # Commands requiring controller connection
+    client = UniFiClient.from_env()
+    client.login()
+
+    if args.cmd == "status":
+        return cmd_status(client)
+    if args.cmd == "backup":
+        return cmd_backup(client, repo_root)
+    if args.cmd == "rollback":
+        # minimal rollback placeholder: print last state path
+        if STATE_FILE.exists():
+            print(f"Would rollback using {STATE_FILE}")
+            return 0
+        else:
+            print("No state file found for rollback")
+            return 1
 
     print("Unknown command")
     return 1
