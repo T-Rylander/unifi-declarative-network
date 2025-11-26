@@ -38,7 +38,7 @@ def validate_vlan_count(vlans: dict[str, Any], hardware_profile: str) -> None:
     
     # Hardware-specific limits
     limits = {
-        "usg3p": 4,      # UniFi Security Gateway 3P (EdgeOS-based)
+        "usg3p": 8,      # UniFi Security Gateway 3P (EdgeOS-based)
         "uxg-pro": 32,   # Next-gen gateway (full Linux network stack)
         "udm-se": 32,    # Dream Machine Special Edition
         "udm-pro": 32,   # Dream Machine Pro

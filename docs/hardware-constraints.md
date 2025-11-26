@@ -11,22 +11,17 @@ This document exists to ensure future contributors understand **why** we have ex
 
 ---
 
-## Key Hardware Constraint: 4 VLAN Maximum
-The USG-3P supports a maximum of **4 VLANs** (including VLAN 1, which is mandatory for the default LAN).
+## VLAN Capacity and Practical Limits
+USG-3P officially supports up to **15 tagged VLANs**. Real-world stable limit with full routing/QoS is typically **8–10**. This deployment uses **6** VLANs total (**5 tagged + 1 untagged legacy**), balancing segmentation and performance.
 
-### Why This Limit Exists
-- The USG-3P uses an older EdgeOS-based firmware (Vyatta fork)
-- Hardware switching is limited to 4 VLAN contexts in the onboard switch fabric
-- Exceeding this limit causes either:
-  - Silent provisioning failures (VLANs 5+ ignored)
-  - Controller adoption failures
-  - Performance degradation (CPU-based routing instead of hardware offload)
+### Practical Considerations
+- EdgeOS-based platform with limited hardware offload paths
+- Inter-VLAN routing and QoS can push traffic to CPU without proper tuning
+- More VLANs increase control-plane complexity and potential adoption issues
 
-### Official Ubiquiti Guidance
-From the USG-3P datasheet (as of firmware 4.4.57):
-> "Supports up to 4 VLANs with hardware offloading. Additional VLANs will route via CPU and may reduce throughput."
-
-In practice, **4 is the hard limit** for production deployments. Community reports confirm instability beyond this threshold.
+### Guidance Summary
+- Datasheets and community reports vary; official capacity supports many tags but performance depends on features enabled.
+- We cap at **8** for USG-3P in code to keep routing/QoS stable, with room to expand if needed.
 
 ---
 
@@ -41,10 +36,8 @@ Given the 4-VLAN constraint, we prioritized **core segmentation** over convenien
 | **30** | `trusted-users` | **Daily operations.** Workstations, laptops, osTicket Pi5. Must be isolated from servers and IoT. |
 | **40** | `voip-critical` | **QoS + compliance.** SIP traffic requires DSCP EF (46), dedicated subnet, LLDP-MED for phone provisioning. |
 
-### What We Intentionally Omitted
-- **VLAN 90 (IoT/Guests)** — would have been ideal for Chromecast, smart speakers, guest Wi-Fi
-  - **Solution:** Handled via SSID-level isolation + MAC-based firewall rules
-  - Trade-off: Less elegant, but avoids the 5th VLAN
+### Additional Segments
+- **VLAN 90 (IoT/Guests)** now included as a dedicated, isolated segment with firewall controls.
 
 ---
 
@@ -96,30 +89,9 @@ When we eventually upgrade to next-generation hardware (UXG-Pro, UDM-SE, or futu
 
 ## CI/CD Enforcement
 
-The `validate_vlan_count()` function in `src/unifi_declarative/validators.py` ensures we **cannot accidentally break the USG-3P** during development:
+The `validate_vlan_count()` function in `src/unifi_declarative/validators.py` enforces **profile-specific VLAN caps**. For USG‑3P we currently set a conservative limit of **8** VLANs to maintain stability under routing/QoS.
 
-```python
-def validate_vlan_count(vlans: dict, hardware_profile: str) -> None:
-    """
-    Enforce hardware-specific VLAN limits.
-    
-    Args:
-        vlans: Parsed VLAN configuration from vlans.yaml
-        hardware_profile: 'usg3p', 'uxg-pro', 'udm-se', etc.
-    
-    Raises:
-        ValidationError: If VLAN count exceeds hardware limit
-    """
-    vlan_count = len(vlans)
-    
-    if hardware_profile == "usg3p" and vlan_count > 4:
-        raise ValidationError(
-            f"USG-3P supports max 4 VLANs. Found {vlan_count}. "
-            f"See docs/hardware-constraints.md for migration guidance."
-        )
-```
-
-This runs **before** any API calls to the controller, ensuring fail-fast behavior.
+This check runs **before** any API calls to the controller, ensuring fail-fast behavior and preventing unstable configurations.
 
 ---
 
@@ -147,7 +119,4 @@ This runs **before** any API calls to the controller, ensuring fail-fast behavio
 ---
 
 **Bottom Line:**  
-We have 4 VLANs because the USG-3P has 4 VLAN contexts.  
-We chose wisely.  
-When we upgrade, we'll expand elegantly.  
-Until then, this is the law.
+USG-3P can handle more than 4 VLANs, but practical stability is best around **8–10** with routing/QoS. We operate with **6** VLANs today to keep performance and manageability balanced.

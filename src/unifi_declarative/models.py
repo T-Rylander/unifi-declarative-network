@@ -38,10 +38,4 @@ class VLANConfig(BaseModel):
 
 class NetworkConfig(BaseModel):
     vlans: Dict[str, VLANConfig]
-
-    @field_validator('vlans')
-    def max_four_vlans(cls, v):
-        enabled = [x for x in v.values() if x.enabled]
-        if len(enabled) > 4:
-            raise ValueError(f"USG-3P supports max 4 VLANs, found {len(enabled)}")
-        return v
+    # Removed hardcoded 4-VLAN limit; hardware limits enforced in validators.py
