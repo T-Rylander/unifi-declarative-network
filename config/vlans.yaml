@@ -85,6 +85,25 @@ vlans:
       downlink_priority: 7
       dscp_marking: 46
     enabled: true
+  "90":
+    name: guest-iot
+    purpose: Guest WiFi and IoT devices - isolated from trusted networks
+    subnet: 10.0.90.0/24
+    gateway: 10.0.90.1
+    vlan_id: 90
+    vlan_enabled: true
+    networkgroup: LAN
+    domain_name: guest.rylan.home
+    dhcp_enabled: true
+    dhcp_start: 10.0.90.100
+    dhcp_stop: 10.0.90.250
+    dhcp_lease: 3600
+    dhcp_dns: [1.1.1.1, 1.0.0.1]
+    igmp_snooping: false
+    multicast_dns: false
+    ipv6_interface_type: none
+    enabled: true
+    notes: Guest and IoT isolation - no access to other VLANs
 
   'legacy':
     name: 'legacy-corporate'
