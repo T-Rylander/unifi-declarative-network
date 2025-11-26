@@ -50,6 +50,22 @@ class UniFiClient:
         except HTTPError as e:
             raise RuntimeError(f"API error {resp.status_code}: {resp.text}")
 
+    def put(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = f"{self.base_url}{path}"
+        try:
+            resp = self.session.put(url, json=payload, verify=self.verify_ssl, timeout=30)
+            if resp.status_code == 401:
+                self.login()
+                resp = self.session.put(url, json=payload, verify=self.verify_ssl, timeout=30)
+            resp.raise_for_status()
+            return resp.json()
+        except Timeout:
+            raise RuntimeError("Controller timeout after 30s")
+        except ConnectionError as e:
+            raise RuntimeError(f"Cannot reach controller: {e}")
+        except HTTPError as e:
+            raise RuntimeError(f"API error {resp.status_code}: {resp.text}")
+
     def export_backup(self) -> bytes:
         # Controller export endpoint varies by version; using legacy path
         path = f"/api/s/{self.site}/cmd/backup"
@@ -62,7 +78,7 @@ class UniFiClient:
         """List network configurations (includes VLANs)."""
         return self.get(f"/api/s/{self.site}/rest/networkconf")
 
-    def upsert_vlan(self, vlan: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_vlan(self, vlan: Dict[str, Any], existing: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Create or update a VLAN network configuration."""
         payload = {
             "name": vlan["name"],
@@ -78,7 +94,27 @@ class UniFiClient:
         }
         # Remove None values
         payload = {k: v for k, v in payload.items() if v is not None}
+        if existing and existing.get("_id"):
+            return self.put(f"/api/s/{self.site}/rest/networkconf/{existing['_id']}", payload)
         return self.post(f"/api/s/{self.site}/rest/networkconf", payload)
+
+    def find_existing_vlan(self, networks: Any, vlan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Find existing network by VLAN ID or name."""
+        try:
+            for n in networks.get("data", networks if isinstance(networks, list) else []):
+                if str(n.get("vlan")) == str(vlan.get("vlan_id")) or n.get("name") == vlan.get("name"):
+                    return n
+        except Exception:
+            pass
+        return None
+
+    def provision_gateway(self) -> None:
+        """Optional: trigger gateway provision (best-effort, may vary by version)."""
+        try:
+            self.post(f"/api/s/{self.site}/cmd/devmgr", {"cmd": "force-provision"})
+        except Exception:
+            # non-fatal
+            pass
 
     @classmethod
     def from_env(cls) -> "UniFiClient":

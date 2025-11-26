@@ -13,6 +13,8 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Apply UniFi configuration (dry-run by default)")
     parser.add_argument("--dry-run", action="store_true", help="Do not perform any API calls")
+    parser.add_argument("--migrate", action="store_true", help="Allow changes to VLAN 1 and controller migration")
+    parser.add_argument("--force", action="store_true", help="Skip interactive confirmation and safety checks")
     args = parser.parse_args()
 
     load_dotenv()
@@ -48,10 +50,47 @@ def main() -> int:
         client = UniFiClient.from_env()
         client.login()
         live_networks = client.list_networks()
-        # Upsert each desired VLAN
+
+        # Pre-apply safety: backup
+        try:
+            backup_bytes = client.export_backup()
+            backups_dir = repo_root / "backups"
+            backups_dir.mkdir(parents=True, exist_ok=True)
+            (backups_dir / "pre-apply.unf").write_bytes(backup_bytes)
+            print(f"Backup saved: {backups_dir / 'pre-apply.unf'}")
+        except Exception as e:
+            if not args.force:
+                print(f"Backup failed: {e}. Aborting (use --force to skip)")
+                return 1
+            else:
+                print(f"Backup failed: {e}. Continuing due to --force")
+
+        # Confirmation unless forced
+        if not args.force:
+            print("About to apply VLAN changes to controller. Type 'yes' to proceed:", end=" ")
+            try:
+                if input().strip().lower() != "yes":
+                    print("Aborted.")
+                    return 1
+            except EOFError:
+                print("No input available. Aborting.")
+                return 1
+
+        # Upsert each desired VLAN (ID-aware)
         for key, vlan in vlans.items():
-            client.upsert_vlan(vlan)
+            # Skip touching VLAN 1 unless migrating
+            if int(vlan.get("vlan_id", 0)) == 1 and not args.migrate:
+                print("Skipping VLAN 1 changes (use --migrate to allow)")
+                continue
+            existing = client.find_existing_vlan(live_networks, vlan)
+            client.upsert_vlan(vlan, existing=existing)
         print(f"Applied {len(vlans)} VLAN(s) to controller.")
+
+        # Provisioning wait (best-effort)
+        import time
+        print("Waiting for provisioning to settle...")
+        time.sleep(20)
+        client.provision_gateway()
 
         # Save last applied state
         state_dir = repo_root / "config" / ".state"

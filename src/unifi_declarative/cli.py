@@ -108,6 +108,8 @@ def main() -> int:
 
     p_apply = sub.add_parser("apply")
     p_apply.add_argument("--dry-run", action="store_true")
+    p_apply.add_argument("--migrate", action="store_true")
+    p_apply.add_argument("--force", action="store_true")
 
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parents[2]
@@ -131,7 +133,17 @@ def main() -> int:
             print("No state file found for rollback")
             return 1
     if args.cmd == "apply":
-        return cmd_apply(repo_root, args.dry_run)
+        # Reuse apply entry in apply.py to avoid duplicate logic
+        from .apply import main as apply_main
+        # Build args for apply_main via sys.argv handoff
+        sys.argv = [sys.argv[0]]
+        if args.dry_run:
+            sys.argv.append("--dry-run")
+        if args.migrate:
+            sys.argv.append("--migrate")
+        if args.force:
+            sys.argv.append("--force")
+        return apply_main()
 
     print("Unknown command")
     return 1
