@@ -108,7 +108,9 @@ def main() -> int:
 
     p_apply = sub.add_parser("apply")
     p_apply.add_argument("--dry-run", action="store_true")
+    p_apply.add_argument("--check-mode", action="store_true")
     p_apply.add_argument("--migrate", action="store_true")
+    p_apply.add_argument("--i-understand-vlan1-risks", action="store_true")
     p_apply.add_argument("--force", action="store_true")
 
     args = parser.parse_args()
@@ -139,8 +141,12 @@ def main() -> int:
         sys.argv = [sys.argv[0]]
         if args.dry_run:
             sys.argv.append("--dry-run")
+        if args.check_mode:
+            sys.argv.append("--check-mode")
         if args.migrate:
             sys.argv.append("--migrate")
+        if hasattr(args, 'i_understand_vlan1_risks') and args.i_understand_vlan1_risks:
+            sys.argv.append("--i-understand-vlan1-risks")
         if args.force:
             sys.argv.append("--force")
         return apply_main()

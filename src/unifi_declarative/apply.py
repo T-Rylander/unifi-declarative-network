@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 import yaml
 from dotenv import load_dotenv
@@ -13,7 +14,9 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Apply UniFi configuration (dry-run by default)")
     parser.add_argument("--dry-run", action="store_true", help="Do not perform any API calls")
+    parser.add_argument("--check-mode", action="store_true", help="Validate configs without connecting to controller")
     parser.add_argument("--migrate", action="store_true", help="Allow changes to VLAN 1 and controller migration")
+    parser.add_argument("--i-understand-vlan1-risks", action="store_true", help="Explicit acknowledgement of VLAN 1 modification risks")
     parser.add_argument("--force", action="store_true", help="Skip interactive confirmation and safety checks")
     args = parser.parse_args()
 
@@ -35,6 +38,10 @@ def main() -> int:
         validate_vlan_count(vlans, hardware_profile="usg3p")
         for key, vlan in vlans.items():
             validate_vlan_schema(vlan)
+
+        if args.check_mode:
+            print(f"Check-mode: {len(vlans)} VLANs validated successfully. No controller connection.")
+            return 0
 
         # Diff desired vs. placeholder live state
         desired = data
@@ -78,19 +85,28 @@ def main() -> int:
 
         # Upsert each desired VLAN (ID-aware)
         for key, vlan in vlans.items():
-            # Skip touching VLAN 1 unless migrating
-            if int(vlan.get("vlan_id", 0)) == 1 and not args.migrate:
-                print("Skipping VLAN 1 changes (use --migrate to allow)")
-                continue
+            # Skip touching VLAN 1 unless explicitly acknowledged
+            if int(vlan.get("vlan_id", 0)) == 1:
+                if not args.migrate or not args.i_understand_vlan1_risks:
+                    print("\n⚠️  WARNING: VLAN 1 is the default management network.")
+                    print("Modifying VLAN 1 can break device adoption and controller access.")
+                    print("Use --migrate --i-understand-vlan1-risks to proceed.\n")
+                    continue
             existing = client.find_existing_vlan(live_networks, vlan)
             client.upsert_vlan(vlan, existing=existing)
+            existing = client.find_existing_vlan(live_networks, vlan)
+            client.upsert_vlan(vlan, existing=existing)
+            # Community recommendation: delay between operations to avoid controller deadlock
+            time.sleep(2)
         print(f"Applied {len(vlans)} VLAN(s) to controller.")
 
-        # Provisioning wait (best-effort)
-        import time
-        print("Waiting for provisioning to settle...")
-        time.sleep(20)
+        # Provisioning wait with polling
+        print("Triggering provision and waiting for devices to settle...")
         client.provision_gateway()
+        if client.wait_for_provisioning(timeout=90):
+            print("Provisioning complete.")
+        else:
+            print("⚠️  Provisioning timeout (devices may still be settling). Check controller UI.")
 
         # Save last applied state
         state_dir = repo_root / "config" / ".state"

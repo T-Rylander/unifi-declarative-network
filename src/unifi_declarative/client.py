@@ -4,7 +4,28 @@ import time
 import requests
 from requests.exceptions import Timeout, ConnectionError, HTTPError
 from typing import Any, Dict, Optional
+from functools import wraps
 from dotenv import load_dotenv
+
+
+def retry_on_429(max_retries=3, backoff=2.0):
+    """Retry on 429 rate limit with exponential backoff."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except RuntimeError as e:
+                    if "429" in str(e) and attempt < max_retries - 1:
+                        wait = backoff ** attempt
+                        time.sleep(wait)
+                    else:
+                        raise
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
 
 class UniFiClient:
     def __init__(self, base_url: str, username: str, password: str, site: str = "default", verify_ssl: bool = True):
@@ -33,6 +54,7 @@ class UniFiClient:
         resp.raise_for_status()
         return resp.json()
 
+    @retry_on_429()
     def post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
         try:
@@ -50,6 +72,7 @@ class UniFiClient:
         except HTTPError as e:
             raise RuntimeError(f"API error {resp.status_code}: {resp.text}")
 
+    @retry_on_429()
     def put(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
         try:
@@ -115,6 +138,23 @@ class UniFiClient:
         except Exception:
             # non-fatal
             pass
+
+    def wait_for_provisioning(self, timeout: int = 90, poll_interval: int = 5) -> bool:
+        """Poll device status until provisioning completes or timeout."""
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                devices = self.get(f"/api/s/{self.site}/stat/device")
+                for device in devices.get("data", []):
+                    if device.get("type") in ("usg", "usw"):
+                        if device.get("state") != 1:
+                            time.sleep(poll_interval)
+                            break
+                else:
+                    return True  # All devices ready
+            except Exception:
+                time.sleep(poll_interval)
+        return False
 
     @classmethod
     def from_env(cls) -> "UniFiClient":

@@ -89,9 +89,43 @@ def validate_vlan_schema(vlan_config: dict[str, Any]) -> None:
             f"VLAN ID must be an integer, got {type(vlan_config['vlan_id'])}"
         )
     
+    # VLAN range per 802.1Q (4095 reserved)
     if not (1 <= vlan_config["vlan_id"] <= 4094):
         raise ValidationError(
             f"VLAN ID must be between 1 and 4094, got {vlan_config['vlan_id']}"
+        )
+    
+    if vlan_config["vlan_id"] == 4095:
+        raise ValidationError("VLAN 4095 is reserved per 802.1Q")
+    
+    # DHCP pool validation
+    if vlan_config.get("dhcp_enabled"):
+        subnet_str = str(vlan_config.get("subnet", ""))
+        gateway = vlan_config.get("gateway")
+        dhcp_start = vlan_config.get("dhcp_start")
+        dhcp_stop = vlan_config.get("dhcp_stop")
+        
+        if dhcp_start and dhcp_stop and gateway:
+            try:
+                from ipaddress import ip_address, ip_network
+                subnet = ip_network(subnet_str, strict=False)
+                gw = ip_address(gateway)
+                start = ip_address(dhcp_start)
+                stop = ip_address(dhcp_stop)
+                
+                if int(gw) >= int(start) and int(gw) <= int(stop):
+                    raise ValidationError(
+                        f"DHCP pool {dhcp_start}-{dhcp_stop} overlaps gateway {gateway}"
+                    )
+            except Exception as e:
+                if "DHCP pool" in str(e):
+                    raise
+    
+    # IGMP snooping warning (UniFi-specific)
+    if vlan_config.get("igmp_snooping") and vlan_config["vlan_id"] in [1, 2]:
+        import warnings
+        warnings.warn(
+            f"IGMP snooping on VLAN {vlan_config['vlan_id']} may affect UniFi device discovery"
         )
 
 
