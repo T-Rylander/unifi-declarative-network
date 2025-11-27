@@ -7,7 +7,7 @@
 ## Overview
 The UniFi Security Gateway 3P (USG-3P) is the gateway device currently deployed in the `rylan.home` network. While highly capable for small-to-medium deployments, it has specific architectural constraints that directly shaped our VLAN design.
 
-This document exists to ensure future contributors understand **why** we have exactly 4 VLANs and **what happens** when we eventually migrate to next-gen hardware.
+This document exists to ensure future contributors understand **why** we cap USG-3P at ~8 VLANs for stability and **what happens** when we eventually migrate to next-gen hardware.
 
 ---
 

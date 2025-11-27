@@ -114,10 +114,10 @@ The `rylan-home-bootstrap` repository successfully provisioned a UniFi network u
 ### Example Test Case (from `tests/test_validators.py`)
 ```python
 def test_usg3p_vlan_limit():
-    """USG-3P must reject configs with >4 VLANs."""
-    vlans = {str(i): {"vlan_id": i} for i in range(1, 6)}  # 5 VLANs
+    """USG-3P should cap VLANs conservatively (e.g., 8)."""
+    vlans = {str(i): {"vlan_id": i} for i in range(1, 10)}  # 9 VLANs
     
-    with pytest.raises(ValidationError, match="USG-3P supports max 4 VLANs"):
+    with pytest.raises(ValidationError, match="USG-3P supports max 8 VLANs"):
         validate_vlan_count(vlans, hardware_profile="usg3p")
 ```
 
@@ -132,9 +132,9 @@ def test_usg3p_vlan_limit():
 
 ---
 
-### Hardware Constraint Addendum (25 Nov 2025)
+### Hardware Constraint Addendum (27 Nov 2025)
 
-USG-3P supports only 4 VLANs total. We consciously placed UniFi management on VLAN 1 (Ubiquiti best practice) and eliminated VLAN 90 in favor of SSID-level guest isolation + MAC-based IoT rules. Full rationale and UXG-Pro migration path in `docs/hardware-constraints.md`.
+USG-3P officially supports up to 15 tagged VLANs; practical stability with full routing/QoS is best around 8–10. This deployment uses 6 (5 tagged + 1 untagged legacy during bootstrap). See `docs/hardware-constraints.md`.
 
 **Validator enforcement:**  
-The `validate_vlan_count()` function in `src/unifi_declarative/validators.py` ensures CI fails fast if `config/vlans.yaml` exceeds the 4-VLAN limit for USG-3P deployments. When we migrate to UXG-Pro or UDM-SE, we update the `hardware_profile` environment variable and the validator automatically relaxes the constraint.
+`validate_vlan_count()` caps USG-3P at 8 VLANs for stability. On UXG-Pro/UDM-SE profiles, the limit increases accordingly.

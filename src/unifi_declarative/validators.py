@@ -30,9 +30,9 @@ def validate_vlan_count(vlans: dict[str, Any], hardware_profile: str) -> None:
         ValidationError: If VLAN count exceeds hardware limit for the given profile
     
     Example:
-        >>> vlans = {"1": {...}, "10": {...}, "30": {...}, "40": {...}, "90": {...}}
+        >>> vlans = {"10": {...}, "30": {...}, "40": {...}, "90": {...}, "100": {...}, "110": {...}, "120": {...}, "130": {...}, "140": {...}}
         >>> validate_vlan_count(vlans, "usg3p")
-        ValidationError: USG-3P supports max 4 VLANs. Found 5.
+        ValidationError: USG-3P supports max 8 VLANs. Found 9.
     """
     vlan_count = len(vlans)
     
