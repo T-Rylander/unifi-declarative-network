@@ -2,28 +2,6 @@
 # 25 November 2025 — Travis + Grok + Leo
 
 vlans:
-  "1":
-    name: unifi-management
-    purpose: UniFi Controller, Cloud Key, APs, Switches — adoption & management plane
-    subnet: 10.0.1.0/27
-    gateway: 10.0.1.1
-    vlan_id: 1
-    vlan_enabled: true
-    networkgroup: LAN
-    domain_name: rylan.home
-    dhcp_enabled: true
-    dhcp_start: 10.0.1.10
-    dhcp_stop: 10.0.1.30
-    dhcp_lease: 86400
-    dhcp_dns: [10.0.10.10]
-    igmp_snooping: true
-    multicast_dns: true
-    enabled: true
-    notes: |
-      Required default LAN on USG-3P.
-      UniFi Controller lives here at 10.0.1.20 (macvlan).
-      All network gear adopts from VLAN 1.
-
   "10":
     name: servers-infra
     purpose: rylan-dc, AI workstation, monitoring, NFS, FreePBX
@@ -105,23 +83,4 @@ vlans:
     enabled: true
     notes: Guest and IoT isolation - no access to other VLANs
 
-  legacy:
-    name: legacy-corporate
-    purpose: Temporary bootstrap (192.168.1.0/24) - delete post-migration
-    subnet: 192.168.1.0/24
-    gateway: 192.168.1.1
-    vlan_id: 0
-    vlan_enabled: false
-    networkgroup: LAN
-    domain_name: rylan.home
-    dhcp_enabled: true
-    dhcp_start: 192.168.1.100
-    dhcp_stop: 192.168.1.200
-    dhcp_lease: 86400
-    dhcp_dns:
-      - 192.168.1.1
-      - 1.1.1.1
-    igmp_snooping: false
-    multicast_dns: true
-    enabled: true
-    notes: Safety net - manual delete after all devices migrated
+

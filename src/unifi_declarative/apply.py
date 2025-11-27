@@ -20,6 +20,12 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="Skip interactive confirmation and safety checks")
     args = parser.parse_args()
 
+    # UniFi 9.5.21 + USG-3P note:
+    # REQUIRED MANUAL STEP BEFORE RUNNING THIS SCRIPT:
+    # 1) Adopt USG-3P first in the controller UI
+    # 2) Immediately change the Default LAN to 10.0.1.0/27 via UI
+    #    (Do NOT attempt to manage VLAN 1 in config; this script will skip vlan_id == 1.)
+    # This sequence is mandatory before any VLAN creation; see README Bootstrap section.
     load_dotenv()
 
     repo_root = Path(__file__).resolve().parents[2]

@@ -39,11 +39,20 @@ python -m src.unifi_declarative.validate
 python -m src.unifi_declarative.apply --dry-run
 ```
 
-## Migration & Operations 🛤️
-- `docs/MIGRATION_GUIDE.md`: Step-by-step migration runbook (manual, safe OS changes; use `netplan try`).
-- `docs/ROLLBACK_PROCEDURES.md`: Emergency recovery for netplan, controller restore, and switch port reversion.
-- `docs/MANUAL_TASKS.md`: OS tasks intentionally kept manual (netplan, DNS, UFW, time sync, device re-inform).
-- Script: `scripts/pre-migration-smoke-test.sh` — non-destructive checks (controller reachability, backup presence, offline validation).
+## Bootstrap & Migration (UniFi 9.5.21 + USG-3P)
+The only reliable sequence for 9.5.21 with USG-3P:
+
+1. Factory reset all devices (default network 192.168.1.0/24).
+2. Start a fresh controller; complete the wizard with a local admin (skip Ubiquiti cloud login → no 2FA).
+3. Adopt the USG-3P first.
+4. Immediately change the Default LAN to `10.0.1.0/27` in the UI. This manual change is mandatory before creating any VLANs.
+5. Adopt switches and APs.
+6. Run the script from this repo to apply VLANs and firewall.
+
+Notes:
+- VLAN 1 is managed manually in the UI and must not appear in `config/vlans.yaml`.
+- Legacy bootstrap network (192.168.1.0/24) must not use `vlan_id: 1` in config.
+- Ensure controller authentication uses a local admin without 2FA for automation.
 
 ## Architecture
 See `docs/hardware-constraints.md` for USG-3P design decisions.
