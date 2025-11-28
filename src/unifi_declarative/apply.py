@@ -126,13 +126,15 @@ def main() -> int:
 
         # Upsert each desired VLAN (ID-aware)
         for key, vlan in vlans.items():
-            # Skip touching VLAN 1 unless explicitly acknowledged
+            # CRITICAL: NEVER touch VLAN 1 via API (UniFi 9.5.21 hard requirement)
+            # VLAN 1 must be changed manually in UI before running this script
+            # Attempting to manage VLAN 1 via API causes api.err.VlanUsed and breaks adoption
             if int(vlan.get("vlan_id", 0)) == 1:
-                if not args.migrate or not args.i_understand_vlan1_risks:
-                    logger.warning("\n⚠️  WARNING: VLAN 1 is the default management network.")
-                    logger.warning("Modifying VLAN 1 can break device adoption and controller access.")
-                    logger.warning("Use --migrate --i-understand-vlan1-risks to proceed.\n")
-                    continue
+                logger.error(
+                    "⛔ VLAN 1 detected in config. This should never happen due to validation. "
+                    "VLAN 1 MUST be managed manually via controller UI. Skipping."
+                )
+                continue
             existing = client.find_existing_vlan(live_networks, vlan)
             client.upsert_vlan(vlan, existing=existing)
             existing = client.find_existing_vlan(live_networks, vlan)

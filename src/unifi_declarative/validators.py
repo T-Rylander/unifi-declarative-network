@@ -37,6 +37,15 @@ def validate_vlan_count(vlans: dict[str, Any], hardware_profile: str) -> None:
         >>> validate_vlan_count(vlans, "usg3p")
         ValidationError: USG-3P supports max 8 VLANs. Found 9.
     """
+    # Check for VLAN 1 in dictionary keys (forbidden in declarative config)
+    if "1" in vlans:
+        raise ValidationError(
+            "VLAN key '1' found in vlans.yaml. VLAN 1 (Default LAN) must be managed "
+            "manually via the controller UI, not in declarative config. Remove VLAN 1 "
+            "from vlans.yaml and change it to 10.0.1.0/27 in the UI after adopting USG. "
+            "See docs/9.5.21-NOTES.md for details."
+        )
+    
     vlan_count = len(vlans)
     
     # Hardware-specific limits
@@ -97,6 +106,17 @@ def validate_vlan_schema(vlan_config: dict[str, Any]) -> None:
     if not isinstance(vlan_config["vlan_id"], int):
         raise ValidationError(
             f"VLAN ID must be an integer, got {type(vlan_config['vlan_id'])}"
+        )
+    
+    # VLAN 1 is FORBIDDEN in declarative config (UniFi 9.5.21 requirement)
+    # VLAN 1 must be managed manually via controller UI to prevent adoption failures
+    if vlan_config["vlan_id"] == 1:
+        raise ValidationError(
+            "VLAN 1 (Default LAN) MUST NOT be in vlans.yaml. "
+            "UniFi 9.5.21 requires VLAN 1 to be changed manually in the UI BEFORE "
+            "adopting devices or creating VLANs. Attempting to manage VLAN 1 via API "
+            "causes 'api.err.VlanUsed' errors and breaks device adoption. "
+            "See docs/9.5.21-NOTES.md for the mandatory bootstrap procedure."
         )
     
     # VLAN range per 802.1Q (4095 reserved)

@@ -30,9 +30,10 @@ You will see a warning on every run. Re-enable for production use.
 
 ## Prerequisites
 - Python 3.12+
-- UniFi Controller 8.1+ (9.5.21 tested)
+- UniFi Network Application 9.5.21+ (cookie-based authentication required)
 - USG-3P or compatible gateway
-- Local admin account without 2FA (see `docs/LESSONS_LEARNED.md`)
+- **Local admin account WITHOUT 2FA** (mandatory for automation - see `docs/LESSONS_LEARNED.md`)
+- **Session cookie authentication** (token auth is deprecated in 9.5.21)
 
 ## Quick Start
 ```bash
@@ -56,19 +57,37 @@ python -m src.unifi_declarative.apply --dry-run
 ```
 
 ## Bootstrap & Migration (UniFi 9.5.21 + USG-3P)
-The only reliable sequence for 9.5.21 with USG-3P:
 
-1. Factory reset all devices (default network 192.168.1.0/24).
-2. Start a fresh controller; complete the wizard with a local admin (skip Ubiquiti cloud login → no 2FA).
-3. Adopt the USG-3P first.
-4. Immediately change the Default LAN to `10.0.1.0/27` in the UI. This manual change is mandatory before creating any VLANs.
-5. Adopt switches and APs.
-6. Run the script from this repo to apply VLANs and firewall.
+> 🚨 **CRITICAL: You MUST follow this exact sequence or the script will fail with `api.err.VlanUsed` errors**
 
-Notes:
-- VLAN 1 is managed manually in the UI and must not appear in `config/vlans.yaml`.
-- Legacy bootstrap network (192.168.1.0/24) must not use `vlan_id: 1` in config.
-- Ensure controller authentication uses a local admin without 2FA for automation.
+The **only** reliable bootstrap sequence for UniFi 9.5.21 with USG-3P:
+
+1. **Factory reset** all devices (default network 192.168.1.0/24).
+2. **Start a fresh controller**; complete the wizard with a **local admin** (skip Ubiquiti cloud login → avoids 2FA).
+3. **Adopt the USG-3P first**.
+4. 🔴 **IMMEDIATELY change the Default LAN** to `10.0.1.0/27` in the controller UI:
+   - Navigate to: **Settings → Networks → Default LAN**
+   - Change subnet from `192.168.1.0/24` to `10.0.1.0/27`
+   - Save and provision the USG
+   - **This step is NON-NEGOTIABLE**: UniFi 9.5.21 will reject any API attempts to manage VLAN 1 until you manually change the Default LAN first
+5. **Adopt switches and APs** (they will now use the 10.0.1.0/27 management network).
+6. **Run the script** from this repo to apply VLANs and firewall rules.
+
+### 🛑 Critical Requirements (Battle-Tested)
+
+| Requirement | Why It Matters |
+|-------------|----------------|
+| **VLAN 1 MUST be changed in UI first** | UniFi 9.5.21 rejects API changes to Default LAN. Attempting to manage VLAN 1 via script causes `api.err.VlanUsed` and breaks device adoption. |
+| **VLAN 1 MUST NOT be in `vlans.yaml`** | Script will fail validation if it finds `vlan_id: 1` or key `"1"` in config. VLAN 1 is UI-managed only. |
+| **Cookie-based auth required** | 9.5.21 uses session cookies (`POST /api/login`). Token auth is deprecated. Script handles cookie lifecycle automatically. |
+| **Local admin without 2FA** | 2FA breaks automation. Create a dedicated local admin for API access (see `docs/LESSONS_LEARNED.md`). |
+
+**If you skip step 4**, the script will fail with:
+```
+api.err.VlanUsed: Cannot modify VLAN 1 (Default network in use)
+```
+
+See `docs/9.5.21-KNOWN-ISSUES.md` for detailed troubleshooting.
 
 ## Architecture
 See `docs/hardware-constraints.md` for USG-3P design decisions.
@@ -76,6 +95,7 @@ See `docs/hardware-constraints.md` for USG-3P design decisions.
 ## Documentation
 - **Setup & Operations**:
   - `docs/9.5.21-NOTES.md` — Version-specific bootstrap requirements
+  - `docs/9.5.21-KNOWN-ISSUES.md` — **Battle-tested solutions to every UniFi 9.5.21 + USG-3P issue we survived**
   - `docs/TROUBLESHOOTING.md` — Common issues and solutions
   - `docs/LESSONS_LEARNED.md` — 2FA workarounds and gotchas
 - **Migration & Recovery**:

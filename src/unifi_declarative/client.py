@@ -102,10 +102,14 @@ class UniFiClient:
         return self.get(f"/api/s/{self.site}/rest/networkconf")
 
     def upsert_vlan(self, vlan: Dict[str, Any], existing: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Create or update a VLAN network configuration."""
+        """
+        Create or update a VLAN network configuration.
+        
+        CRITICAL: UniFi 9.5.21 rejects "vlan": 1 in payload for Default LAN.
+        The "vlan" field must be conditionally added only for non-VLAN-1 networks.
+        """
         payload = {
             "name": vlan["name"],
-            "vlan": vlan["vlan_id"],
             "subnet": vlan["subnet"],
             "gateway": vlan["gateway"],
             "dhcp_enabled": vlan.get("dhcp_enabled", True),
@@ -115,6 +119,12 @@ class UniFiClient:
             "purpose": vlan.get("purpose"),
             "enabled": vlan.get("enabled", True),
         }
+        
+        # Only add "vlan" field if vlan_id is present AND not VLAN 1
+        # UniFi 9.5.21 API rejects "vlan": 1 for Default LAN modifications
+        if "vlan_id" in vlan and int(vlan["vlan_id"]) != 1:
+            payload["vlan"] = vlan["vlan_id"]
+        
         # Remove None values
         payload = {k: v for k, v in payload.items() if v is not None}
         if existing and existing.get("_id"):
