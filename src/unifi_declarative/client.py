@@ -158,11 +158,48 @@ class UniFiClient:
 
     @classmethod
     def from_env(cls) -> "UniFiClient":
+        """
+        Create UniFiClient from environment variables.
+        
+        Reads from .env file (via python-dotenv) for:
+        - UNIFI_CONTROLLER_URL: Controller base URL
+        - UNIFI_USERNAME: Local admin username (not cloud account)
+        - UNIFI_PASSWORD: Admin password
+        - UNIFI_SITE: Site name (default: "default")
+        - UNIFI_VERIFY_SSL: SSL cert verification (default: "true")
+        
+        Returns:
+            UniFiClient: Configured client instance
+            
+        Raises:
+            RuntimeError: If required credentials are missing
+        """
         load_dotenv()
+        base_url = os.getenv("UNIFI_CONTROLLER_URL", "")
+        username = os.getenv("UNIFI_USERNAME", "")
+        password = os.getenv("UNIFI_PASSWORD", "")
+        
+        if not all([base_url, username, password]):
+            raise RuntimeError(
+                "Missing required environment variables. "
+                "Ensure .env has UNIFI_CONTROLLER_URL, UNIFI_USERNAME, and UNIFI_PASSWORD"
+            )
+        
+        verify_ssl_str = os.getenv("UNIFI_VERIFY_SSL", "true").lower()
+        verify_ssl = verify_ssl_str == "true"
+        
+        if not verify_ssl:
+            import warnings
+            warnings.warn(
+                "SSL verification disabled (UNIFI_VERIFY_SSL=false). "
+                "This is insecure and should only be used in isolated test networks.",
+                UserWarning
+            )
+        
         return cls(
-            base_url=os.getenv("UNIFI_CONTROLLER_URL", "http://localhost:8443"),
-            username=os.getenv("UNIFI_USERNAME", ""),
-            password=os.getenv("UNIFI_PASSWORD", ""),
+            base_url=base_url,
+            username=username,
+            password=password,
             site=os.getenv("UNIFI_SITE", "default"),
-            verify_ssl=os.getenv("UNIFI_VERIFY_SSL", "true").lower() == "true",
+            verify_ssl=verify_ssl,
         )

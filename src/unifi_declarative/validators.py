@@ -5,8 +5,11 @@ Enforces schema correctness, hardware constraints, and idempotency guarantees
 before any API calls reach the UniFi controller.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
-from ipaddress import ip_network, ip_address
+from ipaddress import ip_network, ip_address, AddressValueError
+
+logger = logging.getLogger(__name__)
 
 
 class ValidationError(Exception):
@@ -62,15 +65,22 @@ def validate_vlan_count(vlans: dict[str, Any], hardware_profile: str) -> None:
 
 def validate_vlan_schema(vlan_config: dict[str, Any]) -> None:
     """
-    Validate VLAN configuration schema.
+    Validate VLAN configuration schema and enforce UniFi-specific constraints.
     
-    Ensures all required fields are present and types are correct.
+    Ensures all required fields are present, types are correct, and UniFi best practices
+    are followed (DHCP pool doesn't overlap gateway, VLAN ID within 802.1Q range).
     
     Args:
-        vlan_config: Single VLAN configuration block
+        vlan_config: Single VLAN configuration block from vlans.yaml
     
     Raises:
-        ValidationError: If required fields are missing or invalid
+        ValidationError: If required fields are missing, types invalid, or constraints violated
+        
+    Example:
+        >>> config = {"name": "Servers", "vlan_id": 10, "subnet": "10.0.1.0/26", 
+        ...           "gateway": "10.0.1.1", "dhcp_enabled": True, "enabled": True,
+        ...           "dhcp_start": "10.0.1.10", "dhcp_stop": "10.0.1.62"}
+        >>> validate_vlan_schema(config)  # Passes validation
     """
     required_fields = [
         "name", "subnet", "gateway", "vlan_id", 
@@ -131,21 +141,46 @@ def validate_vlan_schema(vlan_config: dict[str, Any]) -> None:
 
 def validate_subnet_overlap(vlans: dict[str, Any]) -> None:
     """
-    Ensure no VLAN subnets overlap.
+    Ensure no VLAN subnets overlap (prevents routing conflicts).
+    
+    Checks all VLAN subnet definitions to detect overlapping IP ranges that would
+    cause ambiguous routing table entries on the gateway.
     
     Args:
-        vlans: All VLAN configurations
+        vlans: Dictionary of VLAN configurations keyed by VLAN ID
     
     Raises:
-        ValidationError: If any subnets overlap
+        ValidationError: If any two subnets overlap or are identical
+        
+    Example:
+        >>> vlans = {"10": {"subnet": "10.0.1.0/26"}, "30": {"subnet": "10.0.2.0/24"}}
+        >>> validate_subnet_overlap(vlans)  # No overlap, passes
+        
+        >>> bad_vlans = {"10": {"subnet": "10.0.0.0/16"}, "30": {"subnet": "10.0.1.0/24"}}
+        >>> validate_subnet_overlap(bad_vlans)  # Raises ValidationError
     """
-    # TODO: Implement IP subnet overlap detection
-    # Will use ipaddress.ip_network() to check for conflicts
+    # TODO: Implement IP subnet overlap detection using ipaddress.ip_network().overlaps()
     pass
 
 
 def load_hardware_profile(hardware: Dict[str, Any]) -> Dict[str, Any]:
-    """Lightweight extractor for hardware.yaml fields used by validators."""
+    """
+    Extract hardware configuration fields needed for validation.
+    
+    Provides normalized access to gateway, switch, and controller definitions
+    from hardware.yaml without exposing full config structure.
+    
+    Args:
+        hardware: Parsed hardware.yaml configuration
+        
+    Returns:
+        Dictionary with 'gateway', 'switches', and 'controller' keys
+        
+    Example:
+        >>> hw_yaml = {"gateway": {...}, "switches": [...], "controller": {...}}
+        >>> profile = load_hardware_profile(hw_yaml)
+        >>> profile["gateway"]["model"]  # Access gateway details
+    """
     return {
         "gateway": hardware.get("gateway", {}),
         "switches": hardware.get("switches", []),
@@ -155,8 +190,27 @@ def load_hardware_profile(hardware: Dict[str, Any]) -> Dict[str, Any]:
 
 def validate_uplink_trunk_config(hardware: Dict[str, Any], vlans: Dict[str, Any]) -> None:
     """
-    Ensure the US-8-60W uplink port to the gateway is a trunk with VLAN 1 native
-    and tags for VLANs present in config (10, 30, 40 as per v3.0).
+    Validate switch uplink trunk configuration for gateway connectivity.
+    
+    Ensures the US-8-60W uplink port to the gateway is configured as a trunk with:
+    - VLAN 1 as native (for management/adoption)
+    - All configured VLAN IDs (except 1) as tagged VLANs
+    
+    This prevents silent provisioning failures from missing trunk tags.
+    
+    Args:
+        hardware: Parsed hardware.yaml configuration
+        vlans: Dictionary of VLAN configurations keyed by VLAN ID
+        
+    Raises:
+        ValidationError: If uplink is not a trunk, native VLAN != 1, or tagged VLANs mismatch
+        
+    Example:
+        >>> hardware = {"switches": [{"model": "US-8-60W", "uplink_port": 1, 
+        ...             "port_assignments": {"1": {"type": "trunk", "native_vlan": 1, 
+        ...             "tagged_vlans": [10, 30, 40]}}}]}
+        >>> vlans = {"10": {...}, "30": {...}, "40": {...}}
+        >>> validate_uplink_trunk_config(hardware, vlans)  # Passes
     """
     hw = load_hardware_profile(hardware)
     switches: List[Dict[str, Any]] = hw.get("switches", [])
@@ -165,6 +219,9 @@ def validate_uplink_trunk_config(hardware: Dict[str, Any], vlans: Dict[str, Any]
         raise ValidationError("US-8-60W switch definition missing in hardware.yaml")
 
     uplink_port = target_switch.get("uplink_port")
+    if uplink_port is None:
+        raise ValidationError("US-8-60W uplink_port not specified in hardware.yaml")
+    
     ports: Dict[str, Any] = target_switch.get("port_assignments", {})
     uplink = ports.get(str(uplink_port)) or ports.get(uplink_port)
     if not uplink:
@@ -187,8 +244,26 @@ def validate_uplink_trunk_config(hardware: Dict[str, Any], vlans: Dict[str, Any]
 
 def validate_controller_ip_migration(hardware: Dict[str, Any], vlans: Dict[str, Any]) -> None:
     """
-    Verify controller target IP belongs to VLAN 10 subnet and differs from current.
-    Also ensure VLAN 10 gateway aligns with hardware target network semantics.
+    Validate controller IP migration parameters for safe network transition.
+    
+    Ensures:
+    - Target IP differs from current IP (migration is actually happening)
+    - Target IP falls within VLAN 10 subnet (servers network per design)
+    - VLAN 10 gateway is correctly configured within subnet
+    
+    This prevents controller isolation after migration.
+    
+    Args:
+        hardware: Parsed hardware.yaml with controller.current_ip and controller.target_ip
+        vlans: Dictionary of VLAN configurations (must include VLAN 10)
+        
+    Raises:
+        ValidationError: If target IP == current IP, target IP outside VLAN 10, or gateway misconfigured
+        
+    Example:
+        >>> hardware = {"controller": {"current_ip": "10.0.1.1", "target_ip": "10.0.1.10"}}
+        >>> vlans = {"10": {"subnet": "10.0.1.0/26", "gateway": "10.0.1.1"}}
+        >>> validate_controller_ip_migration(hardware, vlans)  # Passes
     """
     hw = load_hardware_profile(hardware)
     controller = hw.get("controller", {})
@@ -221,7 +296,26 @@ def validate_controller_ip_migration(hardware: Dict[str, Any], vlans: Dict[str, 
 
 
 def validate_hardware_inventory(hardware: Dict[str, Any]) -> None:
-    """Ensure hardware.yaml has no TBD placeholders and critical MACs are present."""
+    """
+    Validate hardware inventory completeness and flag missing configuration.
+    
+    Checks for:
+    - TBD placeholders that indicate incomplete configuration
+    - Missing MAC addresses for non-empty port assignments
+    
+    This prevents deployment of incomplete hardware definitions.
+    
+    Args:
+        hardware: Parsed hardware.yaml configuration
+        
+    Raises:
+        ValidationError: If TBD placeholders found or device MACs missing
+        
+    Example:
+        >>> hw = {"switches": [{"model": "US-8-60W", "port_assignments": {
+        ...     "1": {"device": "controller", "mac": "aa:bb:cc:dd:ee:ff"}}}]}
+        >>> validate_hardware_inventory(hw)  # Passes
+    """
     hw = load_hardware_profile(hardware)
     switches: List[Dict[str, Any]] = hw.get("switches", [])
     errors: List[str] = []

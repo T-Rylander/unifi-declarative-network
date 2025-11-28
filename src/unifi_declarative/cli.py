@@ -1,5 +1,12 @@
+"""
+Command-line interface for unifi-declarative-network.
+
+Provides subcommands for validation, status checks, backups, diffs, and rollbacks.
+"""
+
 import sys
 import json
+import logging
 from pathlib import Path
 import yaml
 
@@ -13,6 +20,8 @@ from .validators import (
     ValidationError,
 )
 from .differ import diff_configs
+
+logger = logging.getLogger(__name__)
 
 STATE_DIR = Path("config/.state")
 STATE_FILE = STATE_DIR / "last-applied.yaml"
@@ -33,7 +42,7 @@ def cmd_validate(repo_root: Path) -> int:
     validate_uplink_trunk_config(hardware, vlans)
     validate_controller_ip_migration(hardware, vlans)
     validate_hardware_inventory(hardware)
-    print("Validation OK: VLANs, uplink trunk, controller migration.")
+    logger.info("Validation OK: VLANs, uplink trunk, controller migration.")
     return 0
 
 
@@ -41,10 +50,10 @@ def cmd_status(client: UniFiClient) -> int:
     # Minimal status check: controller version endpoint; varies by API version
     try:
         data = client.get(f"/api/self")
-        print(json.dumps(data, indent=2))
+        logger.info("Controller status:\\n%s", json.dumps(data, indent=2))
         return 0
     except Exception as e:
-        print(f"Error getting status: {e}")
+        logger.error("Error getting status: %s", e)
         return 1
 
 
@@ -55,10 +64,10 @@ def cmd_backup(client: UniFiClient, repo_root: Path) -> int:
         backup_dir.mkdir(parents=True, exist_ok=True)
         out = backup_dir / "controller-backup.unf"
         out.write_bytes(content)
-        print(f"Backup saved: {out}")
+        logger.info("Backup saved: %s", out)
         return 0
     except Exception as e:
-        print(f"Backup failed: {e}")
+        logger.error("Backup failed: %s", e)
         return 2
 
 
@@ -72,10 +81,10 @@ def cmd_apply(repo_root: Path, dry_run: bool) -> int:
 
     # Diff
     dd = diff_configs(desired, live)
-    print("Diff:", json.dumps(dd, indent=2))
+    logger.info("Diff: %s", json.dumps(dd, indent=2))
 
     if dry_run:
-        print("Dry-run: no changes applied.")
+        logger.info("Dry-run: no changes applied.")
         return 0
 
     # TODO: Perform REST apply operations
@@ -92,7 +101,7 @@ def cmd_apply(repo_root: Path, dry_run: bool) -> int:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with STATE_FILE.open("w", encoding="utf-8") as sf:
         yaml.safe_dump(sanitize_state_for_storage(desired), sf, sort_keys=False)
-    print(f"State saved to {STATE_FILE}")
+    logger.info("State saved to %s", STATE_FILE)
     return 0
 
 
@@ -112,8 +121,17 @@ def main() -> int:
     p_apply.add_argument("--migrate", action="store_true")
     p_apply.add_argument("--i-understand-vlan1-risks", action="store_true")
     p_apply.add_argument("--force", action="store_true")
+    p_apply.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    p_apply.add_argument("--log-file", help="Optional log file path")
 
     args = parser.parse_args()
+    
+    # Setup logging
+    from .logging_config import setup_logging
+    log_level = getattr(args, 'log_level', 'INFO')
+    log_file = getattr(args, 'log_file', None)
+    setup_logging(level=log_level, log_file=log_file)
+    
     repo_root = Path(__file__).resolve().parents[2]
 
     if args.cmd == "validate":
@@ -145,15 +163,15 @@ def main() -> int:
     if args.cmd == "backup":
         return cmd_backup(client, repo_root)
     if args.cmd == "rollback":
-        # minimal rollback placeholder: print last state path
+        # minimal rollback placeholder: show last state path
         if STATE_FILE.exists():
-            print(f"Would rollback using {STATE_FILE}")
+            logger.info("Would rollback using %s", STATE_FILE)
             return 0
         else:
-            print("No state file found for rollback")
+            logger.error("No state file found for rollback")
             return 1
 
-    print("Unknown command")
+    logger.error("Unknown command: %s", args.cmd)
     return 1
 
 

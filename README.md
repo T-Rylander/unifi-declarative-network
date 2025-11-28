@@ -12,11 +12,27 @@ Production-grade network automation built for the Rylan-Home Bootstrap foundatio
 - ✅ Idempotent apply operations
 - ✅ Comprehensive testing suite
 
+## Security Best Practices
+
+⚠️ **Critical Security Notes**:
+- **Never commit `.env`** to version control (already in `.gitignore`)
+- **Use strong, unique passwords** for the `api-declarative` controller admin
+- **SSL verification** is enabled by default; only disable for internal testing
+- **Rotate credentials** after any suspected compromise
+- **Backup before apply**: Script auto-backs up, but verify `backups/` directory
+- **Limit API account scope**: Use local-only admin, not owner/super-admin
+
+If you disable SSL verification:
+```bash
+UNIFI_VERIFY_SSL=false  # Only for self-signed certs in isolated networks
+```
+You will see a warning on every run. Re-enable for production use.
+
 ## Prerequisites
 - Python 3.12+
-- UniFi Controller 8.1+
+- UniFi Controller 8.1+ (9.5.21 tested)
 - USG-3P or compatible gateway
-- Completed bootstrap setup
+- Local admin account without 2FA (see `docs/LESSONS_LEARNED.md`)
 
 ## Quick Start
 ```bash
@@ -58,12 +74,17 @@ Notes:
 See `docs/hardware-constraints.md` for USG-3P design decisions.
 
 ## Documentation
-- `docs/adr/001-python-over-bash.md`
-- `docs/hardware-constraints.md`
-- `docs/MIGRATION_GUIDE.md` (step-by-step migration runbook)
-- `docs/ROLLBACK_PROCEDURES.md` (emergency recovery)
-- `docs/MANUAL_TASKS.md` (OS steps intentionally manual)
-- Schema reference (coming soon)
+- **Setup & Operations**:
+  - `docs/9.5.21-NOTES.md` — Version-specific bootstrap requirements
+  - `docs/TROUBLESHOOTING.md` — Common issues and solutions
+  - `docs/LESSONS_LEARNED.md` — 2FA workarounds and gotchas
+- **Migration & Recovery**:
+  - `docs/MIGRATION_GUIDE.md` — Step-by-step migration runbook
+  - `docs/ROLLBACK_PROCEDURES.md` — Emergency recovery procedures
+  - `docs/MANUAL_TASKS.md` — OS tasks kept manual (netplan, DNS, UFW)
+- **Architecture & Decisions**:
+  - `docs/hardware-constraints.md` — USG-3P VLAN limits and design rationale
+  - `docs/adr/001-python-over-bash.md` — Technology choices and validation strategy
 
 ## License
 MIT

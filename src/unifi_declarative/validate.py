@@ -1,4 +1,11 @@
+"""
+Validation entry point for unifi-declarative-network configuration.
+
+Runs comprehensive checks on VLAN schemas, hardware constraints, and topology.
+"""
+
 import sys
+import logging
 from pathlib import Path
 import os
 import yaml
@@ -11,9 +18,19 @@ from .validators import (
     validate_controller_ip_migration,
     ValidationError,
 )
+from .logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> int:
+    """
+    Validate UniFi network configuration files.
+    
+    Returns:
+        0 on success, 1 on file not found, 2 on validation errors, 3 on unexpected errors
+    """
+    setup_logging()
     load_dotenv()
     hardware = os.getenv("HARDWARE_PROFILE", "usg3p")
 
@@ -22,7 +39,7 @@ def main() -> int:
     hardware_path = repo_root / "config" / "hardware.yaml"
 
     if not vlans_path.exists():
-        print(f"Error: VLAN config not found at {vlans_path}")
+        logger.error("VLAN config not found at %s", vlans_path)
         return 1
 
     try:
@@ -46,16 +63,17 @@ def main() -> int:
         validate_uplink_trunk_config(hardware, vlans)
         validate_controller_ip_migration(hardware, vlans)
 
-        print(
-            f"Validation successful: {len(vlans)} VLANs compliant; uplink trunk and controller migration validated."
+        logger.info(
+            "Validation successful: %d VLANs compliant; uplink trunk and controller migration validated.",
+            len(vlans)
         )
         return 0
 
     except ValidationError as e:
-        print(f"ValidationError: {e}")
+        logger.error("ValidationError: %s", e)
         return 2
     except Exception as e:
-        print(f"Unexpected error during validation: {e}")
+        logger.exception("Unexpected error during validation: %s", e)
         return 3
 
 

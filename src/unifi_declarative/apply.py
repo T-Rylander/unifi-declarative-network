@@ -1,5 +1,13 @@
+"""
+Main application logic for applying UniFi network configuration.
+
+Orchestrates validation, diffing, backup, and API provisioning with safety checks
+and user confirmation prompts.
+"""
+
 import sys
 import time
+import logging
 from pathlib import Path
 import yaml
 from dotenv import load_dotenv
@@ -7,9 +15,29 @@ from dotenv import load_dotenv
 from .validators import validate_vlan_count, validate_vlan_schema, ValidationError
 from .differ import diff_configs
 from .client import UniFiClient
+from .logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> int:
+    """
+    Apply declarative VLAN configuration to UniFi controller.
+    
+    Supports multiple modes:
+    - --check-mode: Validate configs without controller connection
+    - --dry-run: Show diff without making changes (requires controller)
+    - Normal: Apply changes with backup and confirmation prompts
+    
+    Returns:
+        0 on success, 1 on validation errors or user abort
+        
+    Environment Variables:
+        UNIFI_CONTROLLER_URL: Controller API endpoint (required)
+        UNIFI_USERNAME: Admin username (required)
+        UNIFI_PASSWORD: Admin password (required)
+        UNIFI_VERIFY_SSL: SSL certificate verification (default: true)
+    """
     import argparse
 
     parser = argparse.ArgumentParser(description="Apply UniFi configuration (dry-run by default)")
@@ -18,7 +46,13 @@ def main() -> int:
     parser.add_argument("--migrate", action="store_true", help="Allow changes to VLAN 1 and controller migration")
     parser.add_argument("--i-understand-vlan1-risks", action="store_true", help="Explicit acknowledgement of VLAN 1 modification risks")
     parser.add_argument("--force", action="store_true", help="Skip interactive confirmation and safety checks")
+    parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        help="Set logging verbosity (default: INFO)")
+    parser.add_argument("--log-file", help="Optional log file path for persistent logs")
     args = parser.parse_args()
+    
+    # Setup logging based on arguments
+    setup_logging(level=args.log_level, log_file=args.log_file)
 
     # UniFi 9.5.21 + USG-3P note:
     # REQUIRED MANUAL STEP BEFORE RUNNING THIS SCRIPT:
@@ -32,7 +66,7 @@ def main() -> int:
     vlans_path = repo_root / "config" / "vlans.yaml"
 
     if not vlans_path.exists():
-        print(f"Error: VLAN config not found at {vlans_path}")
+        logger.error("VLAN config not found at %s", vlans_path)
         return 1
 
     try:
@@ -46,17 +80,17 @@ def main() -> int:
             validate_vlan_schema(vlan)
 
         if args.check_mode:
-            print(f"Check-mode: {len(vlans)} VLANs validated successfully. No controller connection.")
+            logger.info("Check-mode: %d VLANs validated successfully. No controller connection.", len(vlans))
             return 0
 
         # Diff desired vs. placeholder live state
         desired = data
         live = {"vlans": {}}  # TODO: fetch from controller
         dd = diff_configs(desired, live)
-        print("Diff:", dd)
+        logger.debug("Diff: %s", dd)
 
         if args.dry_run:
-            print(f"Dry-run: would reconcile {len(vlans)} VLAN(s). No changes made.")
+            logger.info("Dry-run: would reconcile %d VLAN(s). No changes made.", len(vlans))
             return 0
 
         # Perform REST apply logic via UniFi client
@@ -69,24 +103,25 @@ def main() -> int:
             backup_bytes = client.export_backup()
             backups_dir = repo_root / "backups"
             backups_dir.mkdir(parents=True, exist_ok=True)
-            (backups_dir / "pre-apply.unf").write_bytes(backup_bytes)
-            print(f"Backup saved: {backups_dir / 'pre-apply.unf'}")
+            backup_path = backups_dir / "pre-apply.unf"
+            backup_path.write_bytes(backup_bytes)
+            logger.info("Backup saved: %s", backup_path)
         except Exception as e:
             if not args.force:
-                print(f"Backup failed: {e}. Aborting (use --force to skip)")
+                logger.error("Backup failed: %s. Aborting (use --force to skip)", e)
                 return 1
             else:
-                print(f"Backup failed: {e}. Continuing due to --force")
+                logger.warning("Backup failed: %s. Continuing due to --force", e)
 
         # Confirmation unless forced
         if not args.force:
-            print("About to apply VLAN changes to controller. Type 'yes' to proceed:", end=" ")
+            logger.warning("About to apply VLAN changes to controller. Type 'yes' to proceed: ")
             try:
                 if input().strip().lower() != "yes":
-                    print("Aborted.")
+                    logger.info("Operation aborted by user.")
                     return 1
             except EOFError:
-                print("No input available. Aborting.")
+                logger.error("No input available. Aborting.")
                 return 1
 
         # Upsert each desired VLAN (ID-aware)
@@ -94,9 +129,9 @@ def main() -> int:
             # Skip touching VLAN 1 unless explicitly acknowledged
             if int(vlan.get("vlan_id", 0)) == 1:
                 if not args.migrate or not args.i_understand_vlan1_risks:
-                    print("\n⚠️  WARNING: VLAN 1 is the default management network.")
-                    print("Modifying VLAN 1 can break device adoption and controller access.")
-                    print("Use --migrate --i-understand-vlan1-risks to proceed.\n")
+                    logger.warning("\n⚠️  WARNING: VLAN 1 is the default management network.")
+                    logger.warning("Modifying VLAN 1 can break device adoption and controller access.")
+                    logger.warning("Use --migrate --i-understand-vlan1-risks to proceed.\n")
                     continue
             existing = client.find_existing_vlan(live_networks, vlan)
             client.upsert_vlan(vlan, existing=existing)
@@ -104,29 +139,30 @@ def main() -> int:
             client.upsert_vlan(vlan, existing=existing)
             # Community recommendation: delay between operations to avoid controller deadlock
             time.sleep(2)
-        print(f"Applied {len(vlans)} VLAN(s) to controller.")
+        logger.info("Applied %d VLAN(s) to controller.", len(vlans))
 
         # Provisioning wait with polling
-        print("Triggering provision and waiting for devices to settle...")
+        logger.info("Triggering provision and waiting for devices to settle...")
         client.provision_gateway()
         if client.wait_for_provisioning(timeout=90):
-            print("Provisioning complete.")
+            logger.info("Provisioning complete.")
         else:
-            print("⚠️  Provisioning timeout (devices may still be settling). Check controller UI.")
+            logger.warning("⚠️  Provisioning timeout (devices may still be settling). Check controller UI.")
 
         # Save last applied state
         state_dir = repo_root / "config" / ".state"
         state_dir.mkdir(parents=True, exist_ok=True)
-        with (state_dir / "last-applied.yaml").open("w", encoding="utf-8") as sf:
+        state_path = state_dir / "last-applied.yaml"
+        with state_path.open("w", encoding="utf-8") as sf:
             yaml.safe_dump(desired, sf, sort_keys=False)
-        print(f"State saved to {state_dir / 'last-applied.yaml'}")
+        logger.info("State saved to %s", state_path)
         return 0
 
     except ValidationError as e:
-        print(f"ValidationError: {e}")
+        logger.error("ValidationError: %s", e)
         return 2
     except Exception as e:
-        print(f"Unexpected error during apply: {e}")
+        logger.exception("Unexpected error during apply: %s", e)
         return 3
 
 
