@@ -54,6 +54,20 @@ Settings → System → Advanced → Routing & Firewall → Advanced
 |---------|--------------|--------|
 | Hardware Offload | ✅ Enabled | Maintains WAN performance |
 | Offload Scheduler | ✅ Enabled | QoS hardware acceleration |
-| Offload Layer 2 Blocking | ❌ Disabled | Ensures ACL/firewall rules are enforced for inter-VLAN traffic |
+| **Offload Layer 2 Blocking** | **❌ DISABLED** | **CRITICAL: Must be disabled or ACL policies are bypassed** |
 
 Critical: Layer 2 offloading can bypass firewall rules and ACL policies, breaking VLAN segmentation. Must be disabled.
+
+### Troubleshooting: Segmentation Not Working
+
+**Symptoms:**
+- Devices on isolated VLANs can ping each other despite L3 isolation
+- ACL policies exist but traffic isn't filtered
+
+**Fix:**
+1. Settings → System → Advanced → Routing & Firewall → Advanced
+2. **Uncheck "Offload Layer 2 Blocking"**
+3. Save changes
+4. UniFi Devices → USG-3P → Force Provision
+5. Wait 60-90 seconds
+6. Test connectivity again

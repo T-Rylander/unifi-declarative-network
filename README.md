@@ -57,6 +57,53 @@ python -m src.unifi_declarative.validate
 python -m src.unifi_declarative.apply --dry-run
 ```
 
+## Validation Tests (Production Verified)
+
+### Test 1: Verify Guest/IoT Isolation
+From device on **VLAN 90 (10.0.90.x)**:
+```bash
+# Should WORK (internet access automatic):
+ping 8.8.8.8
+ping 1.1.1.1
+nslookup google.com
+
+# Should FAIL (blocked by L3 isolation):
+ping 10.0.1.20    # Controller
+ping 10.0.10.1    # Servers
+ping 10.0.30.1    # Trusted devices
+ping 10.0.40.1    # VoIP
+```
+
+### Test 2: Verify Trusted → Servers Access
+From device on **VLAN 30 (10.0.30.x)**:
+```bash
+# Should WORK (ACL Policy 1):
+ping 10.0.10.1
+ssh user@10.0.10.5
+
+# Should WORK (ACL Policy 2):
+ping 10.0.40.30   # FreePBX
+
+# Should FAIL (no ACL policy):
+ping 10.0.90.5    # Guest/IoT
+```
+
+### Test 3: Verify VoIP Internal Communication
+From VoIP phone on **VLAN 40 (10.0.40.x)**:
+```bash
+# Should WORK (ACL Policy 3):
+# Phone registers to FreePBX at 10.0.40.30
+# Calls between extensions work
+```
+
+### Test 4: Verify Gateway Access (All VLANs)
+From any VLAN:
+```bash
+# Should WORK (no ACL needed):
+ping 10.0.1.1
+nslookup google.com 10.0.1.1
+```
+
 ## Bootstrap & Migration (UniFi 9.5.21 + USG-3P)
 
 > 🚨 **CRITICAL: You MUST follow this exact sequence or the script will fail with `api.err.VlanUsed` errors**
@@ -90,21 +137,42 @@ api.err.VlanUsed: Cannot modify VLAN 1 (Default network in use)
 
 See `docs/9.5.21-KNOWN-ISSUES.md` for detailed troubleshooting.
 
-## Architecture
-See `docs/hardware-constraints.md` for USG-3P design decisions.
+## Security Architecture
 
-### Segmentation Model (Dual-Layer Security)
-- **L3 Network Isolation** enabled on VLANs 10, 30, 40, 90 (default-deny between VLANs)
-- **IP ACL Policies** explicitly allow required inter-VLAN flows (Trusted→Servers, Trusted→VoIP, VoIP→Servers UDP)
-- **Firewall Rules** used for intra-VLAN control (LAN LOCAL/IN) and internet-bound shaping
-- **Management VLAN 1** excluded from Isolation for adoption/controller operation
+This network uses **L3 Network Isolation + ACL Policies** for VLAN segmentation.
+
+### Primary Enforcement: L3 Network Isolation (ACLs)
+- Settings → Networks → [Network Name] → Advanced → Network Isolation: Enabled
+- Creates default-deny between all isolated VLANs
+- Processed at the gateway (USG-3P) hardware level
+- Explicit ACL policies allow only required inter-VLAN traffic
+
+### Firewall Rules (LAN IN/OUT)
+- **NOT used for VLAN segmentation**
+- Used only for:
+  - Intra-VLAN traffic filtering (devices within same VLAN)
+  - Web content filtering
+  - Application-layer controls
+
+**All inter-VLAN segmentation is handled by L3 Network Isolation + ACL Policies.**
 
 See `docs/network-isolation.md` for exact isolation toggles and ACL policy definitions.
+
+## Architecture Table (Production)
+
+| VLAN | Subnet | Name | Role | L3 Isolation | Inter-VLAN Access |
+|------|--------|------|------|--------------|-------------------|
+| 1 | 10.0.1.0/27 | Management | Controller, USG, switches, APs | ❌ No | Full access to all VLANs |
+| 10 | 10.0.10.0/26 | Servers / Infra | Services, AI workstation, Samba AD | ✅ Yes | Via ACL policies only |
+| 30 | 10.0.30.0/24 | Trusted Devices | Workstations, laptops, osTicket | ✅ Yes | Via ACL policies only |
+| 40 | 10.0.40.0/27 | VoIP | FreePBX, Grandstream phones | ✅ Yes | Via ACL policies only |
+| 90 | 10.0.90.0/25 | Guest + IoT | Guest SSID, smart devices, Denon | ✅ Yes | Internet only (isolated from all VLANs) |
 
 ## Documentation
 - **Setup & Operations**:
   - `docs/9.5.21-NOTES.md` — Version-specific bootstrap requirements
   - `docs/network-isolation.md` — L3 Isolation toggles and IP ACL policies
+  - `docs/acl-policies.md` — Canonical IP ACL policies (3 total)
   - `docs/9.5.21-KNOWN-ISSUES.md` — **Battle-tested solutions to every UniFi 9.5.21 + USG-3P issue we survived**
   - `docs/TROUBLESHOOTING.md` — Common issues and solutions
   - `docs/LESSONS_LEARNED.md` — 2FA workarounds and gotchas
