@@ -34,6 +34,7 @@ You will see a warning on every run. Re-enable for production use.
 - USG-3P or compatible gateway
 - **Local admin account WITHOUT 2FA** (mandatory for automation - see `docs/LESSONS_LEARNED.md`)
 - **Session cookie authentication** (token auth is deprecated in 9.5.21)
+ - **Hardware Offload**: Enable Offload + Scheduler, **disable Layer 2 Blocking** to ensure ACL/firewall enforcement
 
 ## Quick Start
 ```bash
@@ -92,9 +93,18 @@ See `docs/9.5.21-KNOWN-ISSUES.md` for detailed troubleshooting.
 ## Architecture
 See `docs/hardware-constraints.md` for USG-3P design decisions.
 
+### Segmentation Model (Dual-Layer Security)
+- **L3 Network Isolation** enabled on VLANs 10, 30, 40, 90 (default-deny between VLANs)
+- **IP ACL Policies** explicitly allow required inter-VLAN flows (Trusted→Servers, Trusted→VoIP, VoIP→Servers UDP)
+- **Firewall Rules** used for intra-VLAN control (LAN LOCAL/IN) and internet-bound shaping
+- **Management VLAN 1** excluded from Isolation for adoption/controller operation
+
+See `docs/network-isolation.md` for exact isolation toggles and ACL policy definitions.
+
 ## Documentation
 - **Setup & Operations**:
   - `docs/9.5.21-NOTES.md` — Version-specific bootstrap requirements
+  - `docs/network-isolation.md` — L3 Isolation toggles and IP ACL policies
   - `docs/9.5.21-KNOWN-ISSUES.md` — **Battle-tested solutions to every UniFi 9.5.21 + USG-3P issue we survived**
   - `docs/TROUBLESHOOTING.md` — Common issues and solutions
   - `docs/LESSONS_LEARNED.md` — 2FA workarounds and gotchas
