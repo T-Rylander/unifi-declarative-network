@@ -173,6 +173,9 @@ See `docs/network-isolation.md` for exact isolation toggles and ACL policy defin
   - `docs/9.5.21-NOTES.md` — Version-specific bootstrap requirements
   - `docs/network-isolation.md` — L3 Isolation toggles and IP ACL policies
   - `docs/acl-policies.md` — Canonical IP ACL policies (3 total)
+  - `docs/wifi-configuration.md` — SSID configuration (Rylan-Home, Rylan-IoT, Rylan-Guest)
+  - `docs/switch-port-profiles.md` — Port profiles and US-8-60W assignments
+  - `docs/static-reservations.md` — Static DHCP reservations
   - `docs/9.5.21-KNOWN-ISSUES.md` — **Battle-tested solutions to every UniFi 9.5.21 + USG-3P issue we survived**
   - `docs/TROUBLESHOOTING.md` — Common issues and solutions
   - `docs/LESSONS_LEARNED.md` — 2FA workarounds and gotchas
